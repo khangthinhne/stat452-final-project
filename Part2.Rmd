@@ -244,4 +244,62 @@ For 2-Way ANOVA, this method requires the dataset to have at least 2 categorical
 In general, from our chosen dataset, we decide to evaluate the factors that directly affect the student performance on the score. This data constains information over 1000 students, including the daily habits (the study time, hours of sleep, internet access), lifestyles (extracurricular activities, parttime job) demographic information (gender, education level of their parents) and academic performance (final exam score, final grade). It's ideal for exploratory data analysis and 2-Way ANOVA analysis based on the behavioral and demographic factors. 
 
 Specifically, there are 6 categorical factors: `gender` (Male/Female), `parental_education`(PhD/Master/Bachelors/High School/None), `internet_access`(Yes/No), `extracurricular_activities`(Yes/No), `part_time_job`(Yes/No), `final_grade`(A/B/C/D/F). In this method, we pick the continuous response on `final_exam_score` to test the hypothesis whether any factors that affect this response as well as any relationships/interactions between 2 categorical factors.
+  
+  
+## Research Questions & Hypotheses
+
+We investigate whether extracurricular activities and part-time jobs affect students' final exam scores, and whether there is an interaction between the two factors
+
+We follow the 2-way ANOVA model:
+
+
+$$
+Y_{ijk} = \mu + \alpha_i + \beta_j + (\alpha\beta)_{ij} + \epsilon_{ijk}
+$$
+
+with $\epsilon_{ijk} \sim N(0,\sigma^2)$.
+
+
+- $\mu$ is the overall mean.
+- $\alpha_i$ is the effect of the $i$-th level of Factor A, `extracurricular_activities`.
+- $\beta_j$ is the effect of the $j$-th level of Factor B, `part_time_job`.
+- $(\alpha\beta)_{ij}$ is the interaction effect between Factor A and Factor B.
+- $\epsilon_{ijk}$ is the random error term.
+
+### Factor A: Extracurricular Activities
+
+**Research Question:**  
+Does participation in extracurricular activities affect students' final exam scores?
+
+\[
+\begin{cases}
+H_{0a}: \alpha_1 = \alpha_2 = 0\\
+H_{1a}: \text{Not all } \alpha_i \text{ are equal to } 0.
+\end{cases}
+\]
+
+### Factor B: Part-time Job
+
+**Research Question:**  
+Does having a part-time job affect students' final exam scores?
+
+\[
+\begin{cases}
+H_{0b}: \beta_1 = \beta_2 = 0\\
+H_{1b}: \text{Not all } \beta_j \text{ are equal to } 0.
+\end{cases}
+\]
+
+### Interaction Effect
+
+**Research Question:**  
+Does the effect of extracurricular activities on final exam scores depend on whether
+students have a part-time job?
+
+\[
+\begin{cases}
+H_{0ab}: (\alpha\beta)_{ij} = 0 \quad \text{for all } i,j\\
+H_{1ab}: \text{Not all } (\alpha\beta)_{ij} \text{ are equal to } 0.
+\end{cases}
+\]
 
