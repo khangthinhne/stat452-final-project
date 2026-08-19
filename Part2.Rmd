@@ -1,0 +1,247 @@
+---
+title: "ASESII 24A02 Final Project - Part 2"
+subtitle: "2-way ANOVA method"
+author: |
+  | Group 02
+  | Nguyen Thi Yen Nhi (24125071)
+  | Nguyen Khang Thinh (24125104)
+  | Nguyen Van Tinh (24125106)
+  | Nguyen Le Quoc Huy (24125100)
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+    latex_engine: xelatex
+    fig_crop: false
+  html_document:
+    toc: true
+    toc_depth: 3
+link-citations: true
+nocite: |
+  @loshchilov2019decoupledweightdecayregularization, @krogh1992simple
+params:
+  group_number: 02
+fontsize: 11pt
+geometry: margin=1in
+header-includes:
+  - \usepackage{fvextra}
+  - \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,commandchars=\\\{\}}
+  - \DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere}
+  - \usepackage{float}
+  - \usepackage{longtable}
+--- 
+
+# Abstract
+
+# Reproducible setup {-}
+
+```{r setup, warning=FALSE, message = FALSE}
+required_packages <- c("tidyverse", "glmnet", "broom", "knitr", "car", "ggplot2")
+missing_packages <- required_packages[
+  !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
+]
+if (length(missing_packages)) {
+  stop("Install the required packages before rendering: ",
+       paste(missing_packages, collapse = ", "))
+}
+
+library(tidyverse)
+library(glmnet)
+library(broom)
+library(knitr)
+library(car)
+library(ggplot2)
+# `params` exists only while knitting; the fallback
+# keeps interactive chunk runs working.
+has_params <- exists("params") && !is.null(params$group_number)
+group_number <- if (has_params) as.integer(params$group_number) else 4L
+if (length(group_number) != 1L || is.na(group_number) || group_number < 1L) {
+  stop("Set params$group_number to your assigned positive group number.")
+}
+
+seeds <- list(
+  split = 240200L + group_number,
+  cv = 240300L + group_number,
+  features = 240400L + group_number
+)
+```
+
+## Shared helper functions {-}
+
+```{r helpers}
+find_exam_data <- function(filename) {
+  input <- knitr::current_input(dir = TRUE)
+  input_dir <- if (length(input) && nzchar(input)) dirname(input) else getwd()
+  candidates <- c(
+    file.path(input_dir, "data", filename),
+    file.path(input_dir, "..", "data", filename),
+    file.path(getwd(), "data", filename)
+  )
+  existing <- candidates[file.exists(candidates)]
+  if (!length(existing)) stop("Cannot locate ", filename, " by a relative path.")
+  hits <- unique(normalizePath(existing, winslash = "/", mustWork = TRUE))
+  if (length(hits) > 1L && length(unique(unname(tools::md5sum(hits)))) > 1L) {
+    stop("Multiple nonidentical copies of ", filename, " were found.")
+  }
+  hits[[1L]]
+}
+
+split_rows <- function(n, train_prop = 0.80, seed) {
+  stopifnot(n >= 10L, train_prop > 0, train_prop < 1)
+  set.seed(seed)
+  train <- sort(sample.int(n, floor(train_prop * n), replace = FALSE))
+  list(train = train, test = setdiff(seq_len(n), train))
+}
+
+fit_scaler <- function(x, tol = 1e-12) {
+  x <- as.matrix(x)
+  center <- colMeans(x)
+  centered <- sweep(x, 2L, center, "-")
+  scale <- sqrt(colMeans(centered^2))
+  keep <- is.finite(scale) & scale > tol
+  if (!any(keep)) stop("No nonconstant training predictor remains.")
+  list(
+    center = center[keep],
+    scale = scale[keep],
+    keep = keep,
+    dropped = colnames(x)[!keep]
+  )
+}
+
+apply_scaler <- function(x, prep) {
+  x <- as.matrix(x)[, prep$keep, drop = FALSE]
+  x <- sweep(x, 2L, prep$center, "-")
+  sweep(x, 2L, prep$scale, "/")
+}
+
+make_foldid <- function(n, k = 5L, seed) {
+  if (k < 3L || k > n) stop("Require 3 <= k <= number of training rows.")
+  set.seed(seed)
+  sample(rep(seq_len(k), length.out = n))
+}
+
+fit_cv_glmnet <- function(x, y, alpha, foldid) {
+  glmnet::cv.glmnet(
+    x = x,
+    y = y,
+    family = "gaussian",
+    alpha = alpha,
+    foldid = foldid,
+    standardize = FALSE,
+    intercept = TRUE,
+    type.measure = "mse"
+  )
+}
+
+score_regression <- function(y, prediction) {
+  y <- as.numeric(y)
+  prediction <- as.numeric(prediction)
+  if (length(y) != length(prediction) || any(!is.finite(c(y, prediction)))) {
+    stop("Metrics require equal-length finite vectors.")
+  }
+  c(RMSE = sqrt(mean((y - prediction)^2)),
+    MAE = mean(abs(y - prediction)))
+}
+
+count_nonzero <- function(fit, s = "lambda.min", tol = 1e-8) {
+  b <- as.matrix(stats::coef(fit, s = s))
+  slopes <- b[rownames(b) != "(Intercept)", 1L]
+  sum(abs(slopes) > tol)
+}
+
+safe_condition_numbers <- function(x, lambda, tol = 1e-10) {
+  eigenvalues <- eigen(
+    crossprod(x) / nrow(x),
+    symmetric = TRUE,
+    only.values = TRUE
+  )$values
+  largest <- max(eigenvalues)
+  smallest <- max(min(eigenvalues), 0)
+  cutoff <- tol * max(1, largest)
+  c(
+    gram = if (smallest <= cutoff) Inf else largest / smallest,
+    ridge = (largest + lambda) / (smallest + lambda)
+  )
+}
+analysis_model <- function(x, y, alpha, foldid) {
+  model <- fit_cv_glmnet(x = x, y = y, alpha=alpha, foldid = foldid)
+  list(
+    model = model,
+    lambda_min = model$lambda.min,
+    mse_min = model$cvm[model$lambda == model$lambda.min],
+    cond_min = safe_condition_numbers(x, lambda = model$lambda.min)[2],
+    coef_min = coef(model, "lambda.min"),
+    coef_min_norm = sqrt(sum(coef(model, "lambda.min")[-1]^2)),
+    nonzero_min = count_nonzero(model, s="lambda.min"),
+    lambda_1se = model$lambda.1se,
+    cond_1se = safe_condition_numbers(x, lambda = model$lambda.1se)[2],
+    mse_1se = model$cvm[model$lambda == model$lambda.1se],
+    coef_1se = coef(model, "lambda.1se"),
+    coef_1se_norm = sqrt(sum(coef(model, "lambda.1se")[-1]^2)),
+    nonzero_1se = count_nonzero(model, s="lambda.1se")
+  )
+}
+```
+
+# Dataset selection
+
+
+```{r data-configuration}
+
+data <- read.csv("data/student_performance.csv", header = FALSE)
+colnames(data) <- c(
+  "student_id",
+  "gender",
+  "study_time_hours",
+  "attendance_percent",
+  "sleep_hours",
+  "parental_education",
+  "internet_access",
+  "extracurricular_activities",
+  "part_time_job",
+  "previous_grade",
+  "final_exam_score",
+  "final_grade"
+)
+
+config <- list(
+  file = "student_performance.csv",
+  response = "final_exam_score",
+  excluded = "final_exam_score"
+)
+data_raw <- read.csv(find_exam_data(config$file), check.names = FALSE)
+predictors <- setdiff(names(data_raw), config$excluded)
+analysis_data <- data_raw[, c(config$response, predictors), drop = FALSE]
+
+if (anyNA(analysis_data)) stop("Declare a training-only missing-value plan.")
+
+```
+
+
+```{r data-overview, echo=FALSE, warning=FALSE, message=FALSE}
+
+data_overview <- tibble(
+  Variable = names(data_raw),
+  Role     = ifelse(names(data_raw) == config$response, "Response", "Predictor"),
+  Type     = vapply(data_raw, function(x) class(x)[1L], character(1)),
+  Distinct = vapply(data_raw, dplyr::n_distinct, integer(1), na.rm = TRUE),
+  Missing  = vapply(data_raw, function(x) sum(is.na(x)), integer(1))
+)
+
+kable(
+  data_overview,
+  caption = paste("Response and candidate predictors, with the integrity checks",
+                  "run before the split.")
+)
+
+# n_duplicate_rows <- sum(duplicated(analysis_data))
+
+# n_duplicate_rows
+```
+For 2-Way ANOVA, this method requires the dataset to have at least 2 categorical variables along with a continuous response variable for the analysis.
+
+In general, from our chosen dataset, we decide to evaluate the factors that directly affect the student performance on the score. This data constains information over 1000 students, including the daily habits (the study time, hours of sleep, internet access), lifestyles (extracurricular activities, parttime job) demographic information (gender, education level of their parents) and academic performance (final exam score, final grade). It's ideal for exploratory data analysis and 2-Way ANOVA analysis based on the behavioral and demographic factors. 
+
+Specifically, there are 6 categorical factors: `gender` (Male/Female), `parental_education`(PhD/Master/Bachelors/High School/None), `internet_access`(Yes/No), `extracurricular_activities`(Yes/No), `part_time_job`(Yes/No), `final_grade`(A/B/C/D/F). In this method, we pick the continuous response on `final_exam_score` to test the hypothesis whether any factors that affect this response as well as any relationships/interactions between 2 categorical factors.
+
