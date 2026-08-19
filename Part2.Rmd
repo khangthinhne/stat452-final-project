@@ -34,10 +34,8 @@ header-includes:
 
 # Abstract
 
-# Reproducible setup {-}
-
-```{r setup, warning=FALSE, message = FALSE}
-required_packages <- c("tidyverse", "glmnet", "broom", "knitr", "car", "ggplot2")
+```{r setup, echo=FALSE, warning=FALSE, message = FALSE}
+required_packages <- c("tidyverse", "glmnet", "broom", "knitr", "car", "ggplot2", "dplyr", "kableExtra")
 missing_packages <- required_packages[
   !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
 ]
@@ -52,6 +50,8 @@ library(broom)
 library(knitr)
 library(car)
 library(ggplot2)
+library(kableExtra)
+library(dplyr)
 # `params` exists only while knitting; the fallback
 # keeps interactive chunk runs working.
 has_params <- exists("params") && !is.null(params$group_number)
@@ -67,9 +67,8 @@ seeds <- list(
 )
 ```
 
-## Shared helper functions {-}
 
-```{r helpers}
+```{r helpers, echo=FALSE}
 find_exam_data <- function(filename) {
   input <- knitr::current_input(dir = TRUE)
   input_dir <- if (length(input) && nzchar(input)) dirname(input) else getwd()
@@ -186,24 +185,11 @@ analysis_model <- function(x, y, alpha, foldid) {
 
 # Dataset selection
 
+## Data Overview
 
 ```{r data-configuration}
 
-data <- read.csv("data/student_performance.csv", header = FALSE)
-colnames(data) <- c(
-  "student_id",
-  "gender",
-  "study_time_hours",
-  "attendance_percent",
-  "sleep_hours",
-  "parental_education",
-  "internet_access",
-  "extracurricular_activities",
-  "part_time_job",
-  "previous_grade",
-  "final_exam_score",
-  "final_grade"
-)
+data <- read.csv("data/student_performance.csv", header = TRUE)
 
 config <- list(
   file = "student_performance.csv",
@@ -302,4 +288,299 @@ H_{0ab}: (\alpha\beta)_{ij} = 0 \quad \text{for all } i,j\\
 H_{1ab}: \text{Not all } (\alpha\beta)_{ij} \text{ are equal to } 0.
 \end{cases}
 \]
+
+## Descriptive Statistics
+
+### Data Summary Statistics
+```{r data-response-summary, echo=FALSE}
+
+# Overall summary statistics on response
+overall_summary <- data %>%
+  summarise(
+    N = sum(!is.na(final_exam_score)),
+    Mean = mean(final_exam_score, na.rm = TRUE),
+    Median = median(final_exam_score, na.rm = TRUE),
+    Variance = var(final_exam_score, na.rm = TRUE),
+    SD = sd(final_exam_score, na.rm = TRUE),
+    Min = min(final_exam_score, na.rm = TRUE),
+    Max = max(final_exam_score, na.rm = TRUE)
+  )
+
+overall_summary %>%
+  kable(
+    format = "latex",
+    booktabs = TRUE,
+    digits = 2,
+    caption = "Overall Summary Statistics of Final Exam Score",
+    align = "c"
+  ) %>%
+  kable_styling(
+    latex_options = c("hold_position", "striped"),
+    position = "center"
+  )
+
+```
+
+The dataset contains 1,000 observations of final exam scores. The mean score is 83.54, with a median of 83.80, indicating that the scores are centered around the mid-80s. The standard deviation is 10.34, showing moderate variability, while the scores range from 46.8 to 100. The relatively close mean and median suggest no strong skewness in the overall response distribution.
+
+
+```{r data-treatment-combination-summary, echo=FALSE}
+# Summary statistics by treatment combination
+group_summary <- data %>%
+  group_by(
+    extracurricular_activities,
+    part_time_job
+  ) %>%
+  summarise(
+    N = sum(!is.na(final_exam_score)),
+    Mean = mean(final_exam_score, na.rm = TRUE),
+    Median = median(final_exam_score, na.rm = TRUE),
+    Variance = var(final_exam_score, na.rm = TRUE),
+    SD = sd(final_exam_score, na.rm = TRUE),
+    Min = min(final_exam_score, na.rm = TRUE),
+    Max = max(final_exam_score, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+group_summary %>%
+  kable(
+    format = "latex",
+    booktabs = TRUE,
+    digits = 2,
+    caption = "Summary Statistics by Treatment Combination",
+    col.names = c(
+      "Extracurricular",
+      "Part-time Job",
+      "N",
+      "Mean",
+      "Median",
+      "Variance",
+      "SD",
+      "Min",
+      "Max"
+    ),
+    align = "c"
+  ) %>%
+  kable_styling(
+    latex_options = c("hold_position", "striped"),
+    position = "center"
+  )
+```
+
+The four treatment combinations contain 134 to 390 observations, with all combinations adequately represented, although the design is unbalanced. Students without part-time jobs have higher mean final exam scores in both extracurricular activity groups. The mean difference between students with and without a part-time job is approximately 2.51 points for students who do not participate in extracurricular activities and 3.88 points for those who do participate, suggesting a possible interaction effect. The group variances range from 91.59 to 132.03, indicating some variation in within-group spread that should be further examined using the ANOVA assumptions. The means and medians are generally close, suggesting no strong skewness based on these summary statistics.
+
+
+### Visualization
+
+#### Histogram of final score
+
+```{r data-hist, echo=FALSE, fig.width=6, fig.height=4, out.width="90%", fig.align="center"}
+ggplot(data, aes(x = final_exam_score)) +
+  geom_histogram(
+    bins = 20,
+    color = "black"
+  ) +
+  labs(
+    title = "Distribution of Final Exam Scores",
+    x = "Final Exam Score",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+
+final_exam_score <- data$final_exam_score
+
+```
+The histogram shows that final exam scores range from approximately 47 to 100, with most observations concentrated between 70 and 100. The distribution is slightly left-skewed, with a longer tail toward lower
+scores. A relatively large number of observations are also concentrated near the upper end of the score range, particularly around 95 to 100.
+
+#### Box Plot 
+
+```{r data-boxplot, echo=FALSE, fig.width=6, fig.height=4, out.width="90%", fig.align="center"}
+
+ggplot(
+  data,
+  aes(
+    x = interaction(
+      extracurricular_activities,
+      part_time_job
+    ),
+    y = final_exam_score
+  )
+) +
+  geom_boxplot() +
+  labs(
+    title = "Final Exam Scores by Treatment Combination",
+    x = "Extracurricular Activities x Part-time Job",
+    y = "Final Exam Score"
+  ) +
+  theme_minimal()
+```
+The box plot compares the distribution of final exam scores across the four treatment combinations of extracurricular activities and part-time jobs. The groups with no part-time job generally have higher median and mean final exam scores than the corresponding groups with a part-time job.
+
+Among students without a part-time job, the median scores are similar for students with and without extracurricular activities. A similar pattern is observed among students with a part-time job, suggesting that
+the main difference between the groups may be associated with part-time job status rather than extracurricular participation.
+
+The variability across the four groups appears reasonably comparable, although the `Yes.Yes` group shows a somewhat wider spread. A few potential low outliers are also visible. These observations should be examined for data validity rather than removed automatically.
+
+#### Interaction Plot
+
+```{r interaction-plot, echo=FALSE,fig.width=6, fig.height=4, out.width="90%", fig.align="center"}
+# plot code
+ggplot(
+  data,
+  aes(
+    x = part_time_job,
+    y = final_exam_score,
+    group = extracurricular_activities,
+    linetype = extracurricular_activities
+  )
+) +
+  stat_summary(
+    fun = mean,
+    geom = "line"
+  ) +
+  stat_summary(
+    fun = mean,
+    geom = "point",
+    size = 3
+  ) +
+  labs(
+    title = "Interaction Between Extracurricular Activities and Part-time Job",
+    x = "Part-time Job",
+    y = "Mean Final Exam Score",
+    linetype = "Extracurricular Activities"
+  ) +
+  theme_minimal()
+
+```
+
+The interaction plot shows the mean final exam score for each combination of extracurricular activity and part-time job status. For students without a part-time job, participation in extracurricular activities is
+associated with a higher mean final exam score (84.98 versus 84.07). However, among students with a part-time job, the pattern reverses: students participating in extracurricular activities have a slightly lower mean score (81.10 vs 81.56).
+
+The two lines cross between the two levels of part-time job status, indicating a potential interaction between extracurricular activities and part-time job. The estimated difference in the effect of extracurricular
+activities between the two part-time job groups is approximately $-1.37$ points. This suggests that the effect of one factor may depend on the level of the other factor.
+
+However, the interaction plot provides only descriptive evidence. The statistical significance of the interaction will be formally assessed using the two-way ANOVA.
+
+### Assumptions Check
+
+#### Normality of Residuals
+
+```{r fit-model, echo=FALSE}
+# fit model for checking assumptions
+model <- aov(
+  final_exam_score ~
+    extracurricular_activities * part_time_job,
+  data = data
+)
+
+residual <- residuals(model)
+```
+
+
+```{r normality, fig.width=6, fig.height=4, out.width="90%", fig.align="center"}
+qqnorm(residual)
+qqline(residual)
+```
+
+```{r shapiro}
+shapiro.test(residual)
+```
+
+
+The normality assumption was assessed using the normal Q-Q plot,
+histogram of residuals, and the Shapiro-Wilk test. The hypotheses for
+the Shapiro-Wilk test are:
+
+$$
+H_0: \text{The residuals follow a normal distribution}
+$$
+
+$$
+H_1: \text{The residuals do not follow a normal distribution}
+$$
+
+The Shapiro-Wilk test resulted in
+
+$$
+W = 0.9841,\qquad p = 5.728\times10^{-9}.
+$$
+
+Since the p-value is less than 0.05, we reject $H_0$. Therefore, there is statistical evidence that the ANOVA residuals deviate from a normal distribution.
+
+The Q-Q plot also shows deviations from the reference line, particularly in the tails. However, the dataset contains 1,000 observations. With a large sample size, the Shapiro-Wilk test can be highly sensitive to small
+departures from normality. Therefore, the normality assumption was not evaluated based on the p-value alone, and the Q-Q plot was also considered.
+
+Overall, the residuals show some departure from normality, but the deviation should be considered together with the large sample size when evaluating the robustness of the ANOVA.
+
+#### Homogeneity of Variances 
+
+```{r homogeneity}
+leveneTest(
+  final_exam_score ~
+    extracurricular_activities * part_time_job,
+  data = data
+)
+```
+
+The homogeneity of variance assumption was assessed using the treatment
+group box plots and Levene's test. The four treatment combinations are
+formed by `extracurricular_activities` and `part_time_job`.
+
+The hypotheses are:
+
+$$
+H_0:
+\sigma_1^2 = \sigma_2^2 = \sigma_3^2 = \sigma_4^2
+$$
+
+$$
+H_1:
+\text{At least one treatment group has a different variance}
+$$
+
+Levene's test produced
+
+$$
+F = 3.443,\qquad p = 0.0163.
+$$
+Since the p-value is less than 0.05, we reject $H_0$. Therefore, there is statistical evidence that the variances are not equal across the four treatment combinations.
+
+The descriptive statistics also show some differences in group variances. The variances are approximately 91.59, 102.76, 103.00, and 132.03 for the four treatment combinations, respectively. The `Yes.Yes` group has the largest variance, while the `No.No` group has the smallest variance.
+
+Although the homogeneity assumption is statistically violated, the difference in variance is not extremely large, and each treatment combination contains a reasonably large number of observations. The effect of this violation should therefore be considered when interpreting the ANOVA results.
+
+#### Independence of Errors
+
+```{r independence-check}
+sum(duplicated(data$student_id))
+```
+
+The independence assumption requires that the error terms are independent:
+
+$$
+\epsilon_{ijk} \overset{ind}{\sim} N(0,\sigma^2).
+$$
+
+Each observation corresponds to a different student, and no duplicated student IDs were identified. Therefore, the error terms are assumed to be independent. However, this assumption ultimately depends on the data collection process and cannot be formally verified from the dataset alone.
+
+#### Residual diagnostic plots
+
+```{r full-plots, fig.width=6, fig.height=4, out.width="90%", fig.align="center"}
+par(mfrow = c(2, 2))
+plot(model)
+par(mfrow = c(1, 1))
+```
+The residual diagnostic plots show some deviations from normality in the Q-Q plot, particularly in the tails. The Residuals vs Fitted and Scale-Location plots also suggest some variation in residual spread across fitted values, which is consistent with the significant Levene's test. No major high-leverage observations are apparent from the Residuals vs Leverage plot. Overall, the diagnostic plots indicate some violations of the normality and constant-variance assumptions, which should be considered when interpreting the ANOVA results.
+
+### Overall Assessment
+
+The independence assumption is considered reasonable based on the structure of the dataset and the absence of duplicated student IDs. However, the normality and homogeneity of variance assumptions show statistical evidence of violation.
+
+The normality violation should be interpreted cautiously because the dataset contains 1,000 observations and the Shapiro-Wilk test is highly sensitive to small departures from normality. The homogeneity violation
+is more directly supported by Levene's test, although the observed differences in group variances are moderate.
+
+Therefore, the two-way ANOVA can still be used as the primary analysis, but its results should be interpreted with these assumption limitations in mind. A robust sensitivity analysis can be performed to examine
+whether the conclusions remain consistent when unequal variances are taken into account.
+
 
