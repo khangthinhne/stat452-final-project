@@ -189,52 +189,87 @@ analysis_model <- function(x, y, alpha, foldid) {
 
 ```{r data-configuration}
 
-data <- read.csv("data/student_performance.csv", header = TRUE)
+data <- read.csv("data/penguins_size.csv", header = TRUE)
+
+# Treat "." as a missing value
+data[data == "."] <- NA
 
 config <- list(
-  file = "student_performance.csv",
-  response = "final_exam_score",
-  excluded = "final_exam_score"
+  file = "penguins_size.csv",
+  response = "body_mass_g",
+  factors = c("species", "sex")
 )
-data_raw <- read.csv(find_exam_data(config$file), check.names = FALSE)
-predictors <- setdiff(names(data_raw), config$excluded)
-analysis_data <- data_raw[, c(config$response, predictors), drop = FALSE]
 
-if (anyNA(analysis_data)) stop("Declare a training-only missing-value plan.")
+data_raw <- data
 
+analysis_data <- data_raw[
+  ,
+  c(config$response, config$factors),
+  drop = FALSE
+]
+
+colSums(is.na(analysis_data))
+
+analysis_data <- na.omit(analysis_data)
+
+if (anyNA(analysis_data)) {
+  stop("Missing values remain in the analysis data.")
+}
 ```
 
-
 ```{r data-overview, echo=FALSE, warning=FALSE, message=FALSE}
+#str(analysis_data)
+
+#table(analysis_data$species)
+#table(analysis_data$sex)
+
+#table(
+#  analysis_data$species,
+#  analysis_data$sex
+#)
 
 data_overview <- tibble(
   Variable = names(data_raw),
-  Role     = ifelse(names(data_raw) == config$response, "Response", "Predictor"),
-  Type     = vapply(data_raw, function(x) class(x)[1L], character(1)),
-  Distinct = vapply(data_raw, dplyr::n_distinct, integer(1), na.rm = TRUE),
-  Missing  = vapply(data_raw, function(x) sum(is.na(x)), integer(1))
+  Role = ifelse(
+    names(data_raw) == config$response,
+    "Response",
+    "Predictor"
+  ),
+  Type = vapply(
+    data_raw,
+    function(x) class(x)[1L],
+    character(1)
+  ),
+  Distinct = vapply(
+    data_raw,
+    dplyr::n_distinct,
+    integer(1),
+    na.rm = TRUE
+  ),
+  Missing = vapply(
+    data_raw,
+    function(x) sum(is.na(x)),
+    integer(1)
+  )
 )
 
 kable(
   data_overview,
-  caption = paste("Response and candidate predictors, with the integrity checks",
-                  "run before the split.")
+  caption = "Data Overview Before Missing-Value Removal"
 )
-
 # n_duplicate_rows <- sum(duplicated(analysis_data))
 
 # n_duplicate_rows
 ```
 For 2-Way ANOVA, this method requires the dataset to have at least 2 categorical variables along with a continuous response variable for the analysis.
 
-In general, from our chosen dataset, we decide to evaluate the factors that directly affect the student performance on the score. This data constains information over 1000 students, including the daily habits (the study time, hours of sleep, internet access), lifestyles (extracurricular activities, parttime job) demographic information (gender, education level of their parents) and academic performance (final exam score, final grade). It's ideal for exploratory data analysis and 2-Way ANOVA analysis based on the behavioral and demographic factors. 
+In general, from our chosen dataset, we decide to evaluate the factors that are associated with penguin body mass. This dataset contains information about 344 penguins, including species, island, physical measurements such as culmen length, culmen depth, and flipper length, body mass, and sex. It is suitable for exploratory data analysis and 2-Way ANOVA analysis based on the biological and physical characteristics of penguins.
 
-Specifically, there are 6 categorical factors: `gender` (Male/Female), `parental_education`(PhD/Master/Bachelors/High School/None), `internet_access`(Yes/No), `extracurricular_activities`(Yes/No), `part_time_job`(Yes/No), `final_grade`(A/B/C/D/F). In this method, we pick the continuous response on `final_exam_score` to test the hypothesis whether any factors that affect this response as well as any relationships/interactions between 2 categorical factors.
-  
+Specifically, the dataset contains 3 categorical variables: `species` (Adelie/Chinstrap/Gentoo), `island` (Torgersen/Biscoe/Dream), and `sex` (MALE/FEMALE). In this method, we select `species` and `sex` as the two categorical factors and `body_mass_g` as the continuous response variable. The analysis is used to test whether the two factors are associated with differences in mean body mass, as well as whether there is an interaction between the two factors.
   
 ## Research Questions & Hypotheses
 
-We investigate whether parental education and part-time job status are associated with students' final exam scores, and whether there is an interaction between the two factors
+We investigate whether penguin species and sex are associated with differences in mean body mass, and whether there is an interaction between the two factors.
 
 We follow the 2-way ANOVA model:
 
@@ -245,29 +280,28 @@ $$
 
 with $\epsilon_{ijk} \sim N(0,\sigma^2)$.
 
-
 - $\mu$ is the overall mean.
-- $\alpha_i$ is the effect of the $i$-th level of Factor A, `parental_education`.
-- $\beta_j$ is the effect of the $j$-th level of Factor B, `part_time_job`.
+- $\alpha_i$ is the effect of the $i$-th level of Factor A, `species`.
+- $\beta_j$ is the effect of the $j$-th level of Factor B, `sex`.
 - $(\alpha\beta)_{ij}$ is the interaction effect between Factor A and Factor B.
 - $\epsilon_{ijk}$ is the random error term.
 
-### Factor A: Parental Education
+### Factor A: Penguin Species
 
 **Research Question:**  
-Does participation in parental education affect students' final exam scores?
+Is penguin species associated with differences in mean body mass?
 
 \[
 \begin{cases}
-H_{0a}: \alpha_1 = \alpha_2 = \cdots = \alpha_5 = 0\\
+H_{0a}: \alpha_1 = \alpha_2 =  \alpha_3 = 0\\
 H_{1a}: \text{Not all } \alpha_i \text{ are equal to }0.
 \end{cases}
 \]
 
-### Factor B: Part-time Job
+### Factor B: Penguin Sex
 
 **Research Question:**  
-Does having a part-time job affect students' final exam scores?
+Is the sex of penguin associated with differences in mean body mass?
 
 \[
 \begin{cases}
@@ -279,7 +313,7 @@ H_{1b}: \text{Not all } \beta_j \text{ are equal to } 0.
 ### Interaction Effect
 
 **Research Question:**  
-Does the effect of students' part-time job on final exam scores depend on their parental education?
+Does the association between sex and penguin body mass depend on the penguin species?
 
 \[
 \begin{cases}
@@ -294,15 +328,15 @@ H_{1ab}: \text{Not all } (\alpha\beta)_{ij} \text{ are equal to } 0.
 ```{r data-response-summary, echo=FALSE}
 
 # Overall summary statistics on response
-overall_summary <- data %>%
+overall_summary <- analysis_data %>%
   summarise(
-    N = sum(!is.na(final_exam_score)),
-    Mean = mean(final_exam_score, na.rm = TRUE),
-    Median = median(final_exam_score, na.rm = TRUE),
-    Variance = var(final_exam_score, na.rm = TRUE),
-    SD = sd(final_exam_score, na.rm = TRUE),
-    Min = min(final_exam_score, na.rm = TRUE),
-    Max = max(final_exam_score, na.rm = TRUE)
+    N = n(),
+    Mean = mean(body_mass_g, na.rm = TRUE),
+    Median = median(body_mass_g, na.rm = TRUE),
+    Variance = var(body_mass_g, na.rm = TRUE),
+    SD = sd(body_mass_g, na.rm = TRUE),
+    Min = min(body_mass_g, na.rm = TRUE),
+    Max = max(body_mass_g, na.rm = TRUE)
   )
 
 overall_summary %>%
@@ -310,7 +344,7 @@ overall_summary %>%
     format = "latex",
     booktabs = TRUE,
     digits = 2,
-    caption = "Overall Summary Statistics of Final Exam Score",
+    caption = "Overall Summary Statistics of Penguin Body Mass",
     align = "c"
   ) %>%
   kable_styling(
@@ -320,24 +354,24 @@ overall_summary %>%
 
 ```
 
-The dataset contains 1,000 observations of final exam scores. The mean score is 83.54, with a median of 83.80, indicating that the scores are centered around the mid-80s. The standard deviation is 10.34, showing moderate variability, while the scores range from 46.8 to 100. The relatively close mean and median suggest no strong skewness in the overall response distribution.
-
+The dataset contains 333 observations of penguin body mass after removing observations with missing values. The mean body mass is 4207.06 g, with a median of 4050 g, indicating that the body masses are centered around approximately 4.0 to 4.2 kg. The standard deviation is 805.22 g, showing moderate variability in body mass, while the observed values range from 2700 g to 6300 g. The mean being slightly higher than the median suggests a mild right skew in the overall response distribution.
 
 ```{r data-treatment-combination-summary, echo=FALSE}
+
 # Summary statistics by treatment combination
-group_summary <- data %>%
+group_summary <- analysis_data %>%
   group_by(
-    parental_education,
-    part_time_job
+    species,
+    sex
   ) %>%
   summarise(
-    N = sum(!is.na(final_exam_score)),
-    Mean = mean(final_exam_score, na.rm = TRUE),
-    Median = median(final_exam_score, na.rm = TRUE),
-    Variance = var(final_exam_score, na.rm = TRUE),
-    SD = sd(final_exam_score, na.rm = TRUE),
-    Min = min(final_exam_score, na.rm = TRUE),
-    Max = max(final_exam_score, na.rm = TRUE),
+    N = n(),
+    Mean = mean(body_mass_g, na.rm = TRUE),
+    Median = median(body_mass_g, na.rm = TRUE),
+    Variance = var(body_mass_g, na.rm = TRUE),
+    SD = sd(body_mass_g, na.rm = TRUE),
+    Min = min(body_mass_g, na.rm = TRUE),
+    Max = max(body_mass_g, na.rm = TRUE),
     .groups = "drop"
   )
 
@@ -348,8 +382,8 @@ group_summary %>%
     digits = 2,
     caption = "Summary Statistics by Treatment Combination",
     col.names = c(
-      "Parental Education",
-      "Part-time Job",
+      "Species",
+      "Sex",
       "N",
       "Mean",
       "Median",
@@ -365,89 +399,82 @@ group_summary %>%
     position = "center"
   )
 ```
+The dataset contains three levels of species and two levels of sex. Male penguins generally have higher mean body mass than female penguins across all three species.
 
+The difference in mean body mass between males and females varies across species. The difference is approximately 674.65 g for Adelie penguins, 411.76 g for Chinstrap penguins, and 805.10 g for Gentoo penguins.
+This variation provides descriptive evidence of a potential interaction between species and sex.
 
-The dataset contains five levels of parental education and two levels of part-time job status. Students without a part-time job generally have higher mean final exam scores across all parental education levels.
-
-The difference between students with and without a part-time job varies across parental education groups. The decrease is relatively small for students with Master's or no parental education, while the largest
-decrease is observed among students with PhD-educated parents, from 87.44 to 79.51 points.
-
-This variation suggests a potential interaction between parental education and part-time job status. The variability also differs across groups, with the PhD and part-time-job group having the largest variance
-(152.49). Therefore, homogeneity of variance should be carefully checked before conducting the two-way ANOVA.
+Among the six treatment combinations, the Gentoo male group has the highest mean body mass (5484.84 g), while the Adelie female group has the lowest mean body mass (3368.84 g). The group variances range from
+72,565.64 to 120,278.25, with the Adelie male group having the largest variance. Therefore, the homogeneity of variance assumption should be checked before conducting the two-way ANOVA.
 
 ### Visualization
 
-#### Histogram of final score
+#### Histogram of Penguin Body Mass
 
 ```{r data-hist, echo=FALSE, fig.width=6, fig.height=4, out.width="90%", fig.align="center"}
-ggplot(data, aes(x = final_exam_score)) +
+ggplot(analysis_data, aes(x = body_mass_g)) +
   geom_histogram(
     bins = 20,
     color = "black"
   ) +
   labs(
-    title = "Distribution of Final Exam Scores",
-    x = "Final Exam Score",
+    title = "Distribution of Penguin Body Mass",
+    x = "Body Mass",
     y = "Frequency"
   ) +
   theme_minimal()
 
-final_exam_score <- data$final_exam_score
+body_mass_g <- data$body_mass_g
 
 ```
-The histogram shows that final exam scores range from approximately 47 to 100, with most observations concentrated between 70 and 100. The distribution shows a mild left skew, with a longer tail toward lower
-scores. However, the mean (83.54) and median (83.80) are close, suggesting that the skewness is not severe. A relatively large number of observations are also concentrated near the upper end of the score range, particularly around 95 to 100.
+The histogram shows that penguin body masses range from approximately 2700 g to 6300 g, with most observations concentrated between 3000 g and 5000 g. The distribution shows a mild right skew, with a longer tail
+toward higher body masses. This is consistent with the mean body mass (4207.06 g) being higher than the median (4050 g). The distribution also shows relatively high frequencies around 3500 to 4000 g, while fewer observations are found at the upper end of the body mass range.
 
 #### Box Plot 
 
 ```{r data-boxplot, echo=FALSE, fig.width=6.5, fig.height=4.5, out.width="95%", fig.align="center"}
 
 ggplot(
-  data,
+  analysis_data,
   aes(
     x = interaction(
-      parental_education,
-      part_time_job,
+      species,
+      sex,
       sep = " x "
     ),
-    y = final_exam_score
+    y = body_mass_g
   )
 ) +
   geom_boxplot() +
-  labs(
-    title = "Final Exam Scores by Treatment Combination",
-    x = "Parental Education x Part-time Job",
-    y = "Final Exam Score"
+  scale_x_discrete(
+    labels = function(x) gsub(" x ", "\n", x)
   ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(
-      angle = 45,
-      hjust = 1
-    )
-  )
+  labs(
+    title = "Penguin Body Mass by Treatment Combination",
+    x = "Treatment Combination",
+    y = "Body Mass (g)"
+  ) +
+  theme_minimal()
 ```
 
-The box plot compares final exam scores across the ten treatment combinations of parental education and part-time job status. Students without a part-time job generally have higher median and mean final exam
-scores than students with a part-time job within the same parental education level.
+The box plot compares the distribution of penguin body mass across the six treatment combinations of species and sex. Male penguins generally have higher median and mean body mass than female penguins within each species.
 
-The difference is particularly pronounced for students with PhD-educated parents, whose mean score decreases from 87.44 without a part-time job to 79.51 with a part-time job. In contrast, the differences between
-parental education groups are relatively small among students without a part-time job.
+The difference between male and female body mass appears across all three species. The largest difference is observed for Adelie penguins, with mean body mass increasing from 3368.84 g for females to 4043.49 g for males. For Chinstrap penguins, the corresponding means are 3527.21 g and 3938.97 g, while for Gentoo penguins they are 4679.74 g and 5484.84 g.
 
-The spread of the groups is not completely uniform, with the PhD and part-time job group showing the largest variance. A few potential low outliers are also visible. Overall, the plot suggests that both
-parental education and part-time job status may be associated with final exam scores, while the different patterns across parental education levels suggest a possible interaction between the two factors.
+The spread of the groups is not completely uniform, with some groups showing wider variability than others. A few potential low outliers are also visible, particularly in the Chinstrap female group. Overall, the
+plot suggests that both species and sex may be associated with penguin body mass, while the differences in the male-female effect across species provide descriptive evidence of a possible interaction between the two factors.
 
 #### Interaction Plot
 
-```{r interaction-plot, echo=FALSE,fig.width=6, fig.height=4, out.width="90%", fig.align="center"}
-# plot code
+```{r interaction-plot, echo=FALSE, fig.width=6, fig.height=4, out.width="90%", fig.align="center"}
+
 ggplot(
-  data,
+  analysis_data,
   aes(
-    x = part_time_job,
-    y = final_exam_score,
-    group = parental_education,
-    linetype = parental_education
+    x = sex,
+    y = body_mass_g,
+    group = species,
+    linetype = species
   )
 ) +
   stat_summary(
@@ -460,26 +487,21 @@ ggplot(
     size = 3
   ) +
   labs(
-    title = "Interaction Between Parental Education and Part-time Job",
-    x = "Part-time Job",
-    y = "Mean Final Exam Score",
-    linetype = "Parental Education"
+    title = "Interaction Between Species and Sex",
+    x = "Sex",
+    y = "Mean Body Mass (g)",
+    linetype = "Species"
   ) +
   theme_minimal()
-
 ```
 
-The interaction plot shows the mean final exam score for each combination of parental education and part-time job status. Mean final exam scores decrease from the "No" to the "Yes" part-time job group across all
-parental education levels.
+The interaction plot shows the mean body mass for each combination of species and sex. Across all three species, male penguins have higher mean body mass than female penguins. The mean body mass increases by
+approximately 674.66 g for Adelie, 411.76 g for Chinstrap, and 805.10 g for Gentoo penguins.
 
-However, the magnitude of this decrease varies considerably across parental education levels. The mean score decreases by 3.78 points for students with Bachelor's-educated parents and 3.92 points for students
-with High School-educated parents. In comparison, the decrease is only 1.26 points for students with Master's-educated parents and 1.40 points for students with no parental education. The largest decrease is
-observed among students with PhD-educated parents, from 87.44 to 79.51 points.
+The lines are not perfectly parallel. In particular, the Adelie and Chinstrap lines cross between the female and male groups, while the Adelie and Gentoo lines show relatively similar slopes. This provides
+some descriptive evidence that the difference in body mass between males and females may vary across species.
 
-The lines are not parallel and several lines cross, suggesting a potential interaction between parental education and part-time job status. In particular, students with PhD-educated parents have the
-highest mean score when they do not have a part-time job but the lowest mean score when they have a part-time job.
-
-This plot provides descriptive evidence of an interaction. Its statistical significance will be formally assessed using the two-way ANOVA.
+However, the interaction pattern appears relatively modest overall, and the plot alone cannot determine whether the interaction is statistically significant. The significance of the species-by-sex interaction will be formally assessed using the two-way ANOVA.
 
 ### Assumptions Check
 
@@ -488,8 +510,8 @@ This plot provides descriptive evidence of an interaction. Its statistical signi
 ```{r fit-model, echo=FALSE}
 # fit model for checking assumptions
 model <- aov(
-  final_exam_score ~
-    parental_education * part_time_job,
+  body_mass_g ~
+    species * sex,
   data = data
 )
 
@@ -506,71 +528,68 @@ qqline(residual)
 shapiro.test(residual)
 ```
 
-
 The normality assumption was assessed using the normal Q-Q plot and the Shapiro-Wilk test. The hypotheses for
 the Shapiro-Wilk test are:
 
-$$
-H_0: \text{The residuals follow a normal distribution}
-$$
 
-$$
+\[
+\begin{cases}
+H_0: \text{The residuals follow a normal distribution}\\
 H_1: \text{The residuals do not follow a normal distribution}
-$$
+\end{cases}
+\]
+
 
 The Shapiro-Wilk test resulted in
 
 $$
-W = 0.98486,\qquad p = 1.145\times10^{-8}.
+W = 0.99776,\qquad p = 0.9367.
 $$
 
-Since the p-value is less than 0.05, we reject $H_0$. Therefore, there is statistical evidence that the ANOVA residuals deviate from a normal distribution.
+Since the p-value is greater than 0.05, we fail to reject $H_0$. Therefore, there is no statistical evidence that the ANOVA residuals deviate from a normal distribution.
 
-The Q-Q plot also shows deviations from the reference line, particularly in the tails. However, the dataset contains 1,000 observations. With a large sample size, the Shapiro-Wilk test can be highly sensitive to small
-departures from normality. Therefore, the normality assumption was not evaluated based on the p-value alone, and the Q-Q plot was also considered.
+The Q-Q plot also shows that the residuals generally follow the reference line, with only minor deviations at the tails. The Shapiro-Wilk test gives $W=0.99776$ with a p-value of $0.9367$, providing further support for the normality assumption.
 
-Overall, the residuals show some departure from normality, but the deviation should be considered together with the large sample size when evaluating the robustness of the ANOVA.
+Overall, the residuals show no substantial departure from normality, and the normality assumption is considered satisfied for the subsequent two-way ANOVA.
 
 #### Homogeneity of Variances 
 
 ```{r homogeneity}
 leveneTest(
-  final_exam_score ~
-    parental_education * part_time_job,
-  data = data
+  body_mass_g ~
+    species * sex,
+  data = analysis_data
 )
 ```
 
-The homogeneity of variance assumption was assessed using the treatment
-group box plots and Levene's test. The ten treatment combinations are
-formed by `parental_education` and `part_time_job`.
+The homogeneity of variance assumption was assessed using the treatment group box plots and Levene's test. The six treatment combinations are formed by `species` and `sex`.
 
 The hypotheses are:
 
-$$
-H_0:
-\sigma_1^2 = \sigma_2^2 = \sigma_3^2 = \sigma_4^2
-$$
 
-$$
+\[
+\begin{cases}
+H_0:
+\sigma_1^2 = \sigma_2^2 = \sigma_3^2 = \cdots =\sigma_6^2\\
 H_1:
 \text{At least one treatment group has a different variance}
-$$
+\end{cases}
+\]
 
 Levene's test produced
 
 $$
-F = 0.6942,\qquad p = 0.7147
+F(5,327) = 1.3908,\qquad p = 0.2272
 $$
-Since the p-value is greater than 0.05, we fail to reject $H_0$. Therefore, there is no statistical evidence that the variances differ across the ten treatment combinations.
+Since the p-value is greater than 0.05, we fail to reject $H_0$. Therefore, there is no statistical evidence that the variances differ across the six treatment combinations.
 
-The group variances range from approximately 88.40 to 152.49, with the `PhD.Yes` group having the largest variance and the `Bachelors.No` group having the smallest variance. Although the group variances are not
-identical, Levene's test suggests that the differences are not statistically significant. Therefore, the homogeneity of variance assumption is considered satisfied for the subsequent two-way ANOVA.
+The group variances range from approximately 72,565.64 to 120,278.25, with the Adelie male group having the largest variance and the Adelie female group having the smallest variance. Although the group variances
+are not identical, Levene's test suggests that the differences are not statistically significant. Therefore, the homogeneity of variance assumption is considered satisfied for the subsequent two-way ANOVA.
 
 #### Independence of Errors
 
 ```{r independence-check}
-sum(duplicated(data$student_id))
+sum(duplicated(analysis_data))
 ```
 
 The independence assumption requires that the error terms are independent:
@@ -579,27 +598,16 @@ $$
 \epsilon_{ijk} \overset{ind}{\sim} N(0,\sigma^2).
 $$
 
-Each observation corresponds to a different student, and no duplicated student IDs were identified. Therefore, the error terms are assumed to be independent. However, this assumption ultimately depends on the data collection process and cannot be formally verified from the dataset alone.
+The independence assumption was assessed based on the structure of the dataset. Each observation represents an individual penguin, and the dataset does not contain repeated measurements or a time-dependent
+structure. Although some observations have identical values for the selected variables (`body_mass_g`, `species`, and `sex`), these do not necessarily represent duplicate penguins, since different penguins can
+naturally have the same body mass and characteristics.
 
-#### Residual diagnostic plots
-
-```{r full-plots, fig.width=6, fig.height=4, out.width="90%", fig.align="center"}
-par(mfrow = c(2, 2))
-plot(model)
-par(mfrow = c(1, 1))
-```
-
-The residual diagnostic plots show some deviation from normality in the Q-Q plot, particularly in the lower tail. The Residuals vs Fitted plot shows residuals distributed around zero without a clear systematic
-pattern. The Scale-Location plot also does not show a strong funnel-shaped pattern, which is consistent with the non-significant Levene's test ($p=0.7147$).
-
-The Residuals vs Leverage plot shows a few observations with relatively higher leverage, but there is no clear indication of a severely influential observation based on Cook's distance. Overall, the diagnostic
-plots suggest some deviation from normality, while the constant variance assumption appears reasonable.
+Therefore, independence is considered reasonable based on the available dataset information. However, it cannot be formally verified because the dataset does not provide a unique identifier or detailed information about the sampling procedure.
 
 ### Overall Assessment
 
-The independence assumption is considered reasonable based on the structure of the dataset and the absence of duplicated student IDs. The normality assumption shows some deviation, particularly in the tails of the Q-Q plot, while the homogeneity of variance assumption is considered satisfied based on the non-significant Levene's test ($p=0.7147$).
+The independence assumption is considered reasonable based on the structure of the dataset. Each observation represents an individual penguin, and there is no time-dependent or repeated-measurement structure identified in the analysis data. However, independence cannot be formally verified because the dataset does not provide a unique identifier or detailed information about the sampling procedure.
 
-The normality deviation should be interpreted cautiously because the dataset contains 1,000 observations and the Shapiro-Wilk test is highly sensitive to small departures from normality.
+The normality assumption is considered satisfied based on both the Q-Q plot and the Shapiro-Wilk test ($p=0.9367$), which provides no statistical evidence of a departure from normality. The homogeneity of variance assumption is also considered satisfied based on the non-significant Levene's test ($p=0.2272$).
 
-Overall, the assumptions are considered reasonably adequate for conducting the two-way ANOVA. The observed deviation from normality should be acknowledged when interpreting the results, while no substantial concern is indicated for independence or homogeneity of variance.
-
+Overall, the assumptions are considered reasonably adequate for conducting the two-way ANOVA. No substantial concerns are observed regarding normality or homogeneity of variance, while the independence assumption is considered reasonable based on the available dataset information.

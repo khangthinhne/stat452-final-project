@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.8.19)  21 AUG 2026 21:21
+This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.8.19)  22 AUG 2026 01:01
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -978,22 +978,7 @@ LaTeX Font Info:    Font shape `TU/lmtt/bx/n' in size <10.95> not available
 (Font)              Font shape `TU/lmtt/b/n' tried instead on input line 168.
 [1
 
-]
-Overfull \hbox (94.90247pt too wide) in paragraph at lines 224--233
-[]\TU/lmr/m/n/10.95 Specifically, there are 6 categorical factors: \TU/lmtt/m/n/10.95 gender \TU/lmr/m/n/10.95 (Male/Female), \TU/lmtt/m/n/10.95 parental_education\TU/lmr/m/n/10.95 (PhD/Master/Bachelors/High
- []
-
-
-Overfull \hbox (58.76416pt too wide) in paragraph at lines 224--233
-\TU/lmr/m/n/10.95 School/None), \TU/lmtt/m/n/10.95 internet_access\TU/lmr/m/n/10.95 (Yes/No), \TU/lmtt/m/n/10.95 extracurricular_activities\TU/lmr/m/n/10.95 (Yes/No), \TU/lmtt/m/n/10.95 part_time_job\TU/lmr/m/n/10.95 (Yes/No),
- []
-
-
-Overfull \hbox (0.33066pt too wide) in paragraph at lines 224--233
-\TU/lmtt/m/n/10.95 final_grade\TU/lmr/m/n/10.95 (A/B/C/D/F). In this method, we pick the continuous response on \TU/lmtt/m/n/10.95 final_exam_score
- []
-
-[2]
+] [2]
 
 LaTeX Warning: `!h' float specifier changed to `!ht'.
 
@@ -1009,22 +994,19 @@ File: Part2_files/figure-latex/interaction-plot-1.pdf Graphic file (type pdf)
 [6]
 File: Part2_files/figure-latex/normality-1.pdf Graphic file (type pdf)
 <use Part2_files/figure-latex/normality-1.pdf>
-[7] [8] [9]
-File: Part2_files/figure-latex/full-plots-1.pdf Graphic file (type pdf)
-<use Part2_files/figure-latex/full-plots-1.pdf>
-[10] [11] (./Part2.aux)
+[7] [8] [9] [10] (./Part2.aux)
  ***********
 LaTeX2e <2026-06-01>
 L3 programming layer <2026-08-10>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 19748 strings out of 469768
- 367279 string characters out of 5466859
- 939339 words of memory out of 5000000
- 48474 multiletter control sequences out of 15000+600000
- 631370 words of font info for 74 fonts, out of 8000000 for 9000
+ 19739 strings out of 469768
+ 366813 string characters out of 5466859
+ 936278 words of memory out of 5000000
+ 48464 multiletter control sequences out of 15000+600000
+ 631378 words of font info for 75 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
  90i,10n,114p,1478b,466s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-Output written on Part2.pdf (11 pages).
+Output written on Part2.pdf (10 pages).
