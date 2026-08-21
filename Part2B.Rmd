@@ -1,0 +1,77 @@
+---
+title: "Part2B"
+output: html_document
+---
+
+```{r}
+data <- read.csv('data/penguins_size.csv')
+data <- data[!(data$sex == '.'), ]
+data <- na.omit(data)
+
+```
+# ANOVA / Factorial Design Analysis
+```{r}
+model <- aov(body_mass_g ~ species * sex ,data=data)
+
+anova_table <- as.data.frame(summary(model)[[1]])
+p_value <- anova_table$`Pr(>F)`
+f_value <- anova_table$`F value`
+
+kable(anova_table, digits=3, caption = "ANOVA result")
+```
+Using significant level $\alpha$ of 0.05, we observe that all these p-value are less than $\alpha$.
+
+For species, the sum of squares (Sum Sq) is 145,190,219, which is the largest among all factors. Together with the very large F-value of 758.358 and p < 0.001, this indicates that species explains a very large amount of the variation in the response variable and has a highly significant effect.
+
+For sex, the sum of squares is 37,090,262, which is also large compared with the residual sum of squares. The F-value of 387.460 and p < 0.001 show that sex has a highly significant effect on the response variable.
+
+For the species × sex interaction, the degrees of freedom is 2, because the interaction involves the three species and two sex groups. Its sum of squares is 1,676,557, which is much smaller than the sums of squares for species and sex. However, the interaction is still statistically significant, with an F-value of 8.757 and p < 0.001. This indicates that although the interaction explains less variation, the effect of sex still differs significantly among species.
+
+Overall, species contributes the largest amount of variation, as shown by its highest Sum Sq (145,190,219) and F-value (758.358). Sex also contributes a substantial amount of variation, with a Sum Sq of 37,090,262 and F-value of 387.460. The interaction has a much smaller Sum Sq (1,676,557) and F-value (8.757), but it remains significant. Therefore, all three effects—species, sex, and species × sex—are statistically significant (p < 0.001), with species showing the strongest effect.
+
+```{r}
+plot(model, which = 1)
+```
+This residuals are generally scattered around the horizontal zero line across the different fitted values, and the red trend line remains close to zero. This indicates that there is no strong systematic pattern or curvature in the residuals, suggesting that the ANOVA model captures the main structure of the data reasonably well.
+
+The spread of the residuals is somewhat different between the fitted-value groups, but there is no clear funnel-shaped pattern where the spread consistently increases or decreases as the fitted values increase. Therefore, there is no strong visual evidence of severe heteroscedasticity from this plot.
+
+```{r}
+plot(model, which = 2)
+```
+This Q–Q plot shows most of the points closely follow the diagonal reference line, particularly in the middle section of the plot, indicating that the residuals are approximately normally distributed. This suggests that the assumption of normality required for ANOVA is reasonably satisfied.
+
+```{r interaction-plot, echo=FALSE,fig.width=6, fig.height=4, out.width="90%", fig.align="center"}
+
+ggplot(
+  data,
+  aes(
+    x = species,
+    y = body_mass_g,
+    group = sex,
+    linetype = sex
+  )
+) +
+  stat_summary(
+    fun = mean,
+    geom = "line"
+  ) +
+  stat_summary(
+    fun = mean,
+    geom = "point",
+    size = 3
+  ) +
+  labs(
+    title = "Interaction Between Species and Sex",
+    x = "Species",
+    y = "Sex",
+    linetype = "Body mass"
+  ) +
+  theme_minimal()
+
+```
+This plot shows that male penguins generally have higher body mass than females across all species, with the largest difference observed in Gentoo penguins. Gentoo penguins have the highest average body mass for both sexes, followed by Chinstrap and then Adelie penguins. This indicates that species has a strong effect on body mass.
+
+The two lines are not parallel, particularly because the difference between males and females changes across species. For Adelie and Chinstrap penguins, the difference in body mass between sexes is relatively small, while for Gentoo penguins the gap is much larger. This pattern suggests a possible interaction between species and sex, meaning that the effect of sex on body mass depends on the species.
+
+# Posthoc Analysis:
