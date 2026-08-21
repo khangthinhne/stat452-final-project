@@ -583,4 +583,104 @@ is more directly supported by Levene's test, although the observed differences i
 Therefore, the two-way ANOVA can still be used as the primary analysis, but its results should be interpreted with these assumption limitations in mind. A robust sensitivity analysis can be performed to examine
 whether the conclusions remain consistent when unequal variances are taken into account.
 
+# ANOVA / Factorial Design Analysis
+## ANOVA analysis:
 
+```{r}
+model <- aov(final_exam_score ~ extracurricular_activities * part_time_job ,data=data)
+
+anova_table <- as.data.frame(summary(model)[[1]])
+p_extracurricular_activities <- anova_table$`Pr(>F)`[1]
+p_part_time_job <- anova_table$`Pr(>F)`[2]
+p_interaction <- anova_table$`Pr(>F)`[3]
+
+kable(anova_table,caption = "ANOVA result")
+
+```
+
+## Main effect of **extracurricular_activities**:
+
+We apply significant level of $\alpha$ = 0.05, we observe that:
+$$
+  p = `r p_extracurricular_activities`
+$$
+Since p > 0.05, the effect of extracurricular activities is not statistically significant. There is insufficient evidence that students' participation in extracurricular activities is associated with differences in final exam scores.
+
+## Main effect of **part_time_job**:
+
+
+On the other hand, we observe:
+$$
+  p = `r p_part_time_job`
+$$
+The effect of having part time jobs is statisfically significant. There is strong evidence of a difference in final exam scores between the two part-time-job groups.
+
+## Interaction effect:
+The interaction between extracurricular activities and part-time employment is not statistically significant:
+$$
+  p = `r p_interaction`
+$$
+Therefore, there is insufficient evidence that the relationship between extracurricular activities and final exam scores changes depending on whether a student has a part-time job.
+
+# Post-hoc Analysis:
+
+In ANOVA results, There is only one statistically significant being factorpart_time_job, with
+
+$$
+  p = `r p_part_time_job`
+$$
+
+However, part_time_job has only two levels: Yes and No. So, multiple-comparison procedure such as Tukey's HSD is unnecessary, we use only pairwise comparison.
+
+## Group comparison:
+
+We have:
+```{r}
+posthoc <- t.test(
+  final_exam_score ~ part_time_job,
+  data = data
+)
+
+mean_final <- as.matrix(posthoc$estimate)
+
+kable(
+  x = data.frame(
+    Part_time_jobs = c('No','Yes'),
+    Mean_final_exam_score = c(mean_final[1], mean_final[2])
+  ),
+  col.names = c("Part time jobs", "Mean final exam score")
+)
+
+```
+The overall means are obtained by combining the two extracurricular-activity groups within each part-time-job level. Students without a part-time job have an average final exam score of approximately `r mean_final[1]`, compared with `r mean_final[2]` for students with a part-time job.
+
+Thus, the observed mean difference is:
+$$
+`r mean_final[1]`− `r mean_final[2]`= `r mean_final[1] - mean_final[2]`
+$$
+
+Therefore, students without a part-time job scored approximately `r mean_final[1] - mean_final[2]` points higher on average.
+
+This direction is also consistent with the four treatment-group means reported in the descriptive analysis: students without part-time jobs have higher scores in both extracurricular-activity groups.
+
+## Pairwise comparison:
+
+```{r}
+interval <- as.matrix(posthoc$conf.int)
+posthoc
+```
+The comparison gives approximately:
+
+The 95% confidence interval for the mean difference (No - Yes) is approximately:
+$$
+[`r interval[1]`, `r interval[2]`].
+$$
+Because the confidence interval does not contain zero and p<0.05, there is statistically significant evidence that the two part-time-job groups have different mean final exam scores.
+
+## Practical Significance
+
+The statistically significant difference should also be considered in terms of its practical magnitude. The mean final exam score was `r mean_final[1]` for students without a part-time job and `r mean_final[2]` for students with a part-time job, giving an observed difference of approximately `r mean_final[1] - mean_final[2]` points.
+
+Although this difference is statistically significant, the magnitude is relatively small compared with the overall variability in final exam scores. The overall standard deviation of the final exam score is approximately 10.34 points. Therefore, the difference of `r mean_final[1] - mean_final[2]` points represents a noticeable but relatively modest difference in exam performance.
+
+Thus, the results suggest that part-time employment is associated with lower average final exam scores, but the difference should not be interpreted as a large practical effect. Furthermore, because the analysis is based on observational data, this association should not be interpreted as evidence that having a part-time job directly causes lower exam scores.
