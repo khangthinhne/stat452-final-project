@@ -728,15 +728,30 @@ data errors.
 ```{r eda-cor-res-pred, echo=FALSE, warning=FALSE, message=FALSE}
 cor_response <- cor(
   train_df[, predictors],
-  train_df$lpsa
+  train_df[[config$response]]
 )
+colnames(cor_response) <- config$response
 
 knitr::kable(
   round(cor_response, 2),
-  caption = "Correlation between predictors and lpsa"
+  caption = "Correlation between predictors and scaled_sound_pressure"
 )
+
+strongest_pred <- rownames(cor_response)[which.max(abs(cor_response[, 1]))]
+strongest_cor  <- cor_response[strongest_pred, 1]
 ```
 
+Every predictor's marginal correlation with the response is weak in magnitude
+(all $|r| < 0.4$). `r strongest_pred` is the strongest single linear predictor
+($r \approx `r round(strongest_cor, 2)`$), followed by
+`suction_side_displacement_thickness`; `free_stream_velocity` is weakest and the
+only predictor positively correlated with the response. No individual predictor
+comes close to explaining the response on its own, which is consistent with the
+assignment brief's description of this dataset as having "few features but
+nonlinear relationships" - a linear combination of all five predictors, rather
+than any single one, is needed, and Problem 2's regularized models are expected
+to combine these weak individual signals rather than select one dominant
+predictor and discard the rest.
 
 ###  Check multicollinearity using VIF
 ```{r eda-vif, echo=FALSE, warning=FALSE, message=FALSE}
