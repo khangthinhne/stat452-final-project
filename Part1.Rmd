@@ -232,21 +232,21 @@ analysis_model <- function(x, y, alpha, foldid) {
 ```{r data-configuration}
 
 data <- read.table("data/airfoil_self_noise.dat", header = FALSE)
-colnames(data) <- c("frequency", "attack-angle", "chord-length", "free-stream-velocity", "suction-side-displacement-thickness", "scaled-sound-pressure" )
+colnames(data) <- c("frequency", "attack_angle", "chord_length", "free_stream_velocity", "suction_side_displacement_thickness", "scaled_sound_pressure")
 
-if (!file.exists("data/airfoil_self_noise.csv")) {
-  write.csv(
-    data,
-    "data/airfoil_self_noise.csv",
-    row.names = FALSE
-  )
-}
+# Always (re)written from the .dat source so the cached CSV can never drift
+# from the column-naming convention fixed above.
+write.csv(
+  data,
+  "data/airfoil_self_noise.csv",
+  row.names = FALSE
+)
 
 str(data)
 config <- list(
   file = "airfoil_self_noise.csv",
-  response = "scaled-sound-pressure",
-  excluded = "scaled-sound-pressure"
+  response = "scaled_sound_pressure",
+  excluded = "scaled_sound_pressure"
 )
 data_raw <- read.csv(find_exam_data(config$file), check.names = FALSE)
 predictors <- setdiff(names(data_raw), config$excluded)
