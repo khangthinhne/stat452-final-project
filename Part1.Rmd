@@ -768,11 +768,24 @@ vif_model <- lm(
 vif_values <- vif(vif_model)
 
 knitr::kable(
-  round(vif_values, 2),
+  data.frame(VIF = round(vif_values, 2)),
   caption = "Variance Inflation Factor (VIF)"
 )
+
+max_vif_1c      <- max(vif_values)
+max_vif_var_1c  <- names(which.max(vif_values))
 ```
 
+Every VIF is comfortably below the conventional threshold of 5, with
+`r max_vif_var_1c` the highest at `r round(max_vif_1c, 2)`. This confirms the
+correlation-matrix finding above: the airfoil predictors share only mild,
+tolerable overlap, so no predictor needs to be dropped for redundancy, and OLS
+in Problem 2 is not expected to suffer severe coefficient instability from
+multicollinearity. The moderate `attack_angle` / `suction_side_displacement_thickness`
+correlation is still the largest source of shared variance in the data and
+remains worth tracking through ridge and lasso, but it falls well short of the
+kind of collinearity (VIF $\gg$ 5) that would make variable selection a
+necessity rather than a convenience.
 
 ###  Predictor-response plots
 ```{r eda-pre-res-plot, echo=FALSE, warning=FALSE, message=FALSE}
