@@ -826,6 +826,41 @@ together, which is exactly what Problem 2's models are built to do.
 
 ### Question
 
+Taken together, the checks in 1A-1C describe a clean but weak-signal regression
+problem, and that combination shapes what the rest of Problem 1 needs to
+prioritise.
+
+**Data quality is not the challenge here.** There are no missing values, no
+duplicated rows, and the "outliers" flagged by the 1.5×IQR rule are legitimate
+wind-tunnel test conditions from a controlled experiment, not data-entry errors
+- so cleaning required no row deletions or imputation, only the decision (1B) to
+retain every training row and to skip a log transform after checking that it
+does not help the linear fit.
+
+**The predictors are almost uncorrelated with each other.** All VIFs sit well
+under 5, and the one moderately correlated pair
+(`attack_angle` / `suction_side_displacement_thickness`, $r \approx `r round(max_pair_val, 2)`$)
+falls short of severe multicollinearity. This means ridge and lasso in Problem 2
+are not being asked to rescue an ill-conditioned design matrix the way they
+would with, say, several near-duplicate predictors; their main job here is
+tuning the bias-variance trade-off and (for lasso) testing whether any predictor
+can be dropped outright, rather than resolving instability.
+
+**The predictors are individually weak but the relationships are nonlinear.**
+Every predictor-response correlation is under 0.4 in magnitude, and no single
+predictor separates high- from low-noise conditions on its own (the
+`chord_length` and `free_stream_velocity` panels above make this explicit, with
+each fixed level covering a wide spread of the response). At the same time,
+`frequency` fits a quadratic term noticeably better than a straight line
+(1B), and three of the five predictors are effectively small sets of
+experimental design levels (1A) rather than smooth continuous measurements.
+Both point to the same conclusion the assignment brief anticipates for this
+dataset: the frequency-response relationship, and likely others, are genuinely
+nonlinear, so a **linear baseline (OLS) is expected to leave a meaningful
+amount of predictable structure on the table**, and its residuals in Problem 2
+should be inspected for exactly this kind of unmodelled curvature rather than
+assumed to be pure noise.
+
 # Problem 2. OLS, Ridge, and Lasso
 
 ## 2A. OLS baseline
