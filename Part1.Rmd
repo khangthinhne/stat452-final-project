@@ -409,6 +409,63 @@ cannot be negative. No violations are found on the training set, which is
 expected for an instrument-recorded wind-tunnel experiment rather than
 manually-entered data.
 
+### Outlier detection and handling
+
+```{r outlier-detection, echo=FALSE, warning=FALSE, message=FALSE}
+detect_outliers_iqr <- function(x) {
+  q     <- stats::quantile(x, probs = c(0.25, 0.75), na.rm = TRUE)
+  fence <- 1.5 * (q[2] - q[1])
+  which(x < q[1] - fence | x > q[2] + fence)
+}
+
+outlier_cols   <- c(predictors, config$response)
+outlier_counts <- vapply(
+  train_df[, outlier_cols],
+  function(col) length(detect_outliers_iqr(col)),
+  integer(1)
+)
+
+outlier_table <- data.frame(
+  Variable  = outlier_cols,
+  Outliers  = as.integer(outlier_counts),
+  Percent   = round(100 * unname(outlier_counts) / nrow(train_df), 1),
+  row.names = NULL
+)
+
+kable(
+  outlier_table,
+  caption = paste("Training-set values flagged by the 1.5×IQR rule,",
+                   "computed on the training split only.")
+)
+
+freq_outliers  <- outlier_counts[["frequency"]]
+thick_outliers <- outlier_counts[["suction_side_displacement_thickness"]]
+angle_outliers <- outlier_counts[["attack_angle"]]
+resp_outliers  <- outlier_counts[[config$response]]
+```
+
+Outliers were screened with the standard $1.5\times\text{IQR}$ fence, applied to
+each variable using **training-set quantiles only** so that no information from
+the held-out test rows enters the check. `chord_length` and
+`free_stream_velocity` contribute zero flagged points, because - as noted in
+1A - each takes only a handful of fixed values, so every observation sits well
+inside its own IQR fence by construction. `frequency`, `attack_angle`, and
+`suction_side_displacement_thickness` each contribute a nontrivial share
+(`r freq_outliers`, `r angle_outliers`, and `r thick_outliers` training rows
+respectively), and `r resp_outliers` response values are flagged.
+
+These flagged points are **retained rather than removed**. The airfoil data
+come from a controlled wind-tunnel experiment, not a survey or manual data-entry
+process, so there is no mechanism here for typographical or transcription
+errors; every extreme value is a physically valid test condition (a high
+frequency band, a large angle of attack, a thin boundary layer) rather than a
+data-quality defect. The IQR rule is doing exactly what it is designed to do on
+a right-skewed engineering variable: flagging the upper tail of a real physical
+distribution, not finding mistakes. Dropping these rows would bias the training
+sample away from precisely the loud, high-frequency regime the model is meant to
+predict, so all `r nrow(train_df)` training rows are kept for model fitting in
+Problem 2.
+
 ### Leakage control
 
 Several safeguards were implemented to prevent information leakage throughout the analysis:
