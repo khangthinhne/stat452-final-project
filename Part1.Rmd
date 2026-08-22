@@ -795,15 +795,15 @@ par(mfrow = c(2,4))
 for (var in predictors) {
   plot(
     train_df[[var]],
-    train_df$`scaled-sound-pressure`,
+    train_df[[config$response]],
     xlab = var,
-    ylab = "scaled-sound-pressure",
-    main = paste(var, "vs scaled-sound-pressure"),
+    ylab = config$response,
+    main = paste(var, "vs", config$response),
     pch = 19
   )
 
   abline(
-    lm(train_df$`scaled-sound-pressure` ~ train_df[[var]]),
+    lm(train_df[[config$response]] ~ train_df[[var]]),
     col = "red"
   )
 }
@@ -811,6 +811,18 @@ for (var in predictors) {
 par(mfrow = c(1,1))
 ```
 
+The fitted red lines are visibly weak for every panel - the same
+$|r| < 0.4$ ceiling seen in the correlation table above - but the point clouds
+are not simply noise around those lines. The `frequency` panel in particular
+shows the response bending down over its range rather than following the
+straight line, echoing the linear-vs-quadratic $R^2$ comparison from 1B: the
+straight-line fit misses curvature that a richer model could capture. The
+`chord_length` and `free_stream_velocity` panels show their points arranged in
+`r n_levels_chord` and `r n_levels_vel` vertical strips (their fixed
+experimental levels), each strip itself spanning a wide range of the response -
+visual confirmation that these two variables alone say little about the
+outcome, and any predictive power must come from combining all five predictors
+together, which is exactly what Problem 2's models are built to do.
 
 ### Question
 
