@@ -546,12 +546,46 @@ standardization described above; the nonlinearity documented here is noted as a
 limitation of the linear and regularized-linear models used there, rather than
 something a simple transform resolves.
 
+### Data cleaning summary
+
+```{r cleaning-summary, echo=FALSE, warning=FALSE, message=FALSE}
+cleaning_summary <- data.frame(
+  Check = c("Missing values", "Duplicate rows", "Invalid values",
+            "IQR outliers", "Skewness", "Categorical variables",
+            "Predictor scaling"),
+  Result = c(
+    paste(n_missing_total, "cells"),
+    paste(n_duplicate_rows, "rows"),
+    paste(sum(implausible_checks$Violations), "violations"),
+    paste(sum(outlier_counts), "variable-level flags (a row may be flagged on more than one variable)"),
+    "frequency and suction_side_displacement_thickness right-skewed",
+    "none present (all 5 predictors numeric)",
+    "required for ridge / lasso / elastic net"
+  ),
+  Decision = c(
+    "No imputation needed",
+    "No de-duplication needed",
+    "No rows dropped",
+    "Retained (valid experimental conditions, not errors)",
+    "No log transform applied (does not improve the linear fit)",
+    "No encoding needed",
+    "Applied in Problem 2, fit on training data only"
+  )
+)
+
+kable(
+  cleaning_summary,
+  caption = "Summary of data-cleaning checks and decisions carried into Problem 2."
+)
+```
+
 ### Leakage control
 
 Several safeguards were implemented to prevent information leakage throughout the analysis:
 
 - The train–test split was performed before any preprocessing.
 - Predictor standardization used statistics estimated from the training data only.
+- The invalid-value, outlier, and transformation checks above used training-set values, quantiles, and model fits only.
 - Five-fold cross-validation was conducted exclusively within the training set.
 - Hyperparameter tuning for ridge, lasso, and elastic net relied solely on training cross-validation error.
 - The holdout responses (`y_test`) were not accessed until the final evaluation stage.
