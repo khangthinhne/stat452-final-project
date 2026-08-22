@@ -711,7 +711,17 @@ par(mfrow = c(1,1))
 
 ```
 
-.
+The histograms and boxplots make the 1A distinct-value counts visible. `chord_length`
+and `free_stream_velocity` appear as `r n_levels_chord` and `r n_levels_vel`
+narrow, evenly spaced spikes rather than a smooth spread, and `frequency` shows
+`r n_levels_freq` spikes concentrated at the low end with a long right tail -
+these are the fixed experimental levels described in 1A, not gaps in the data.
+`attack_angle` and `suction_side_displacement_thickness` are closer to
+continuous, right-skewed shapes, matching the skewness values quantified in 1B.
+The boxplots' upper whiskers and flagged points for these two variables are the
+same training-set values already counted in the 1B outlier check, retained for
+the same reason: they are valid high-frequency / high-angle test conditions, not
+data errors.
 
 ### Correlation between predictors and response
 
