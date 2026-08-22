@@ -380,6 +380,35 @@ kable(data.frame(Total_missing_values = sum(is.na(analysis_data))))
 
 No missing values were detected; therefore, no imputation was required. If missing values had been present, imputation statistics would have been estimated using only the training data and then applied unchanged to the test data.
 
+### Invalid-value check
+
+```{r invalid-values, echo=FALSE, warning=FALSE, message=FALSE}
+implausible_checks <- data.frame(
+  Variable   = c("frequency", "attack_angle", "chord_length",
+                 "free_stream_velocity", "suction_side_displacement_thickness"),
+  Rule       = c("> 0 Hz", ">= 0 deg", "> 0 m", "> 0 m/s", "> 0 m"),
+  Violations = c(
+    sum(train_df$frequency <= 0),
+    sum(train_df$attack_angle < 0),
+    sum(train_df$chord_length <= 0),
+    sum(train_df$free_stream_velocity <= 0),
+    sum(train_df$suction_side_displacement_thickness <= 0)
+  )
+)
+
+kable(
+  implausible_checks,
+  caption = "Physical-plausibility checks on the training predictors."
+)
+```
+
+Beyond the statistical IQR screen below, each predictor was also checked against
+the range it is physically allowed to take: a frequency, chord length, velocity,
+or boundary-layer thickness cannot be zero or negative, and an angle of attack
+cannot be negative. No violations are found on the training set, which is
+expected for an instrument-recorded wind-tunnel experiment rather than
+manually-entered data.
+
 ### Leakage control
 
 Several safeguards were implemented to prevent information leakage throughout the analysis:
