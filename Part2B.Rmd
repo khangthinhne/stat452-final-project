@@ -1,7 +1,21 @@
 ---
 title: "Part2B"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
+
+```{r}
+library(tidyverse)
+library(glmnet)
+library(broom)
+library(knitr)
+library(car)
+library(ggplot2)
+library(kableExtra)
+library(dplyr)
+library(emmeans)
+```
 
 ```{r}
 data <- read.csv('data/penguins_size.csv')
@@ -9,7 +23,7 @@ data <- data[!(data$sex == '.'), ]
 data <- na.omit(data)
 
 ```
-# ANOVA / Factorial Design Analysis
+# ANOVA / Factorial design analysis
 ```{r}
 model <- aov(body_mass_g ~ species * sex ,data=data)
 
@@ -21,13 +35,13 @@ kable(anova_table, digits=3, caption = "ANOVA result")
 ```
 Using significant level $\alpha$ of 0.05, we observe that all these p-value are less than $\alpha$.
 
-For species, the sum of squares (Sum Sq) is 145,190,219, which is the largest among all factors. Together with the very large F-value of 758.358 and p < 0.001, this indicates that species explains a very large amount of the variation in the response variable and has a highly significant effect.
+For species, the sum of squares is 145,190,219, which is the largest among all factors. Together with the very large F-value of 758.358 and p < 0.001, this indicates that species explains a very large amount of the variation in the response variable and has a highly significant effect.
 
 For sex, the sum of squares is 37,090,262, which is also large compared with the residual sum of squares. The F-value of 387.460 and p < 0.001 show that sex has a highly significant effect on the response variable.
 
-For the species × sex interaction, the degrees of freedom is 2, because the interaction involves the three species and two sex groups. Its sum of squares is 1,676,557, which is much smaller than the sums of squares for species and sex. However, the interaction is still statistically significant, with an F-value of 8.757 and p < 0.001. This indicates that although the interaction explains less variation, the effect of sex still differs significantly among species.
+For the species - sex interaction, the degrees of freedom is 2, because the interaction involves the three species and two sex groups. Its sum of squares is 1,676,557, which is much smaller than the sums of squares for species and sex. However, the interaction is still statistically significant, with an F-value of 8.757 and p < 0.001. This indicates that although the interaction explains less variation, the effect of sex still differs significantly among species.
 
-Overall, species contributes the largest amount of variation, as shown by its highest Sum Sq (145,190,219) and F-value (758.358). Sex also contributes a substantial amount of variation, with a Sum Sq of 37,090,262 and F-value of 387.460. The interaction has a much smaller Sum Sq (1,676,557) and F-value (8.757), but it remains significant. Therefore, all three effects—species, sex, and species × sex—are statistically significant (p < 0.001), with species showing the strongest effect.
+Overall, species contributes the largest amount of variation, as shown by its highest Sum Sq (145,190,219) and F-value (758.358). Sex also contributes a substantial amount of variation, with a Sum Sq of 37,090,262 and F-value of 387.460. The interaction has a much smaller Sum Sq (1,676,557) and F-value (8.757), but it remains significant. Therefore, all three effects—species, sex, and species x sex are statistically significant (p < 0.001), with species showing the strongest effect.
 
 ```{r}
 plot(model, which = 1)
@@ -41,37 +55,63 @@ plot(model, which = 2)
 ```
 This Q–Q plot shows most of the points closely follow the diagonal reference line, particularly in the middle section of the plot, indicating that the residuals are approximately normally distributed. This suggests that the assumption of normality required for ANOVA is reasonably satisfied.
 
-```{r interaction-plot, echo=FALSE,fig.width=6, fig.height=4, out.width="90%", fig.align="center"}
+# Posthoc analysis:
 
-ggplot(
-  data,
-  aes(
-    x = species,
-    y = body_mass_g,
-    group = sex,
-    linetype = sex
-  )
-) +
-  stat_summary(
-    fun = mean,
-    geom = "line"
-  ) +
-  stat_summary(
-    fun = mean,
-    geom = "point",
-    size = 3
-  ) +
-  labs(
-    title = "Interaction Between Species and Sex",
-    x = "Species",
-    y = "Sex",
-    linetype = "Body mass"
-  ) +
-  theme_minimal()
+```{r}
 
+tukey <- TukeyHSD(model, which = "species")
+kable(tukey$species, digits = 3, caption = "Tukey HSD Results")
 ```
-This plot shows that male penguins generally have higher body mass than females across all species, with the largest difference observed in Gentoo penguins. Gentoo penguins have the highest average body mass for both sexes, followed by Chinstrap and then Adelie penguins. This indicates that species has a strong effect on body mass.
+The comparison between Chinstrap and Adelie is not statistically significant, with an adjusted p-value of 0.824, which is greater than 0.05. The confidence interval also includes zero (-80.026 to 133.874). Therefore, there is insufficient evidence to conclude that the mean response differs between Chinstrap and Adelie.
 
-The two lines are not parallel, particularly because the difference between males and females changes across species. For Adelie and Chinstrap penguins, the difference in body mass between sexes is relatively small, while for Gentoo penguins the gap is much larger. This pattern suggests a possible interaction between species and sex, meaning that the effect of sex on body mass depends on the species.
+In contrast, Gentoo differs significantly from Adelie, with a mean difference of 1386.273 and an adjusted p-value less than 0.001. The 95% confidence interval (1296.307 to 1476.238) does not contain zero, providing strong evidence that the two species have different mean responses. Since the mean difference is positive, the mean response for Gentoo is higher than Adelie by approximately 1386.273 units.
 
-# Posthoc Analysis:
+Similarly, Gentoo differs significantly from Chinstrap, with a mean difference of 1359.349 and an adjusted p-value less than 0.001. The 95% confidence interval (1248.611 to 1470.087) is entirely positive, indicating that the mean response for Gentoo is higher than Chinstrap by approximately 1359.349 units.
+
+Overall, the Tukey HSD results show that Gentoo is significantly different from both Adelie and Chinstrap, whereas Adelie and Chinstrap do not differ significantly from each other. This provides more specific information about the significant species effect identified by the ANOVA.
+
+```{r}
+sex_analysis <- t.test(body_mass_g ~ sex,data=data)
+
+tidy_t_test <- tidy(sex_analysis)
+
+kable(
+  tidy_t_test[, c("estimate", "statistic", "p.value", "conf.low", "conf.high")],
+  digits = 3,
+  col.names = c("Mean Difference", "t-Statistic", "p-value", "Lower CI", "Upper CI"),
+  caption = "Independent t-test Comparing Penguin Body Mass by Sex"
+)
+```
+An independent-samples t-test was conducted to compare penguin body mass between male and female penguins. The results showed a mean difference of -683.412 grams, with a t-statistic of -8.555 and a p-value of < 0.001.
+
+The very small p-value indicates a statistically significant difference in body mass between the two sexes. The mean difference of -683.412 grams indicates that the first sex group in the comparison has an average body mass approximately 683.4 grams lower than the second sex group.
+
+The 95% confidence interval for the mean difference ranges from -840.578 to -526.245 grams. Since the entire interval is below zero, the estimated difference is consistently in the same direction. Therefore, the results indicate that one sex has substantially greater average body mass than the other.
+
+Overall, sex is associated with a significant difference in penguin body mass, with an average difference of approximately 683 grams between the two sexes.
+```{r}
+emm_result <- emmeans(model, pairwise ~ sex | species, adjust = "tukey")
+
+kable(
+  as.data.frame(emm_result$contrasts), 
+  digits = 3,
+  col.names = c("Contrast", "Species", "Difference (g)", "Std. Error", "df", "t-ratio", "p.value"),
+  align = "llrrrrr",          
+  caption = "Pairwise Comparisons of Body Mass Between Sexes Stratified by Penguin Species"
+)
+```
+Pairwise comparisons showed that male penguins had significantly higher body mass than females in all three species (p<0.001). The differences were approximately 674.7 g for Adelie, 411.8 g for Chinstrap, and 805.1 g for Gentoo. The largest sex difference occurred in Gentoo, while the smallest occurred in Chinstrap.
+
+## Practical significance
+
+The results are not only statistically significant but also practically meaningful. The differences in body mass between species are large, particularly between Gentoo and the other two species, with differences of more than 1,300 g. The sex differences are also substantial, ranging from approximately 412 g to 805 g, with males consistently heavier than females.
+
+Therefore, species and sex should be considered when assessing or comparing penguin body mass. Ignoring these factors could lead to misleading comparisons, especially when comparing groups with different species or sex compositions.
+
+# Conclusion and evaluation
+
+The two-way ANOVA showed that species and sex both have significant effects on penguin body mass (p<0.001). The Species x Sex interaction was also significant (p<0.001), indicating that the effect of sex on body mass varies among species. Tukey's HSD showed that Gentoo differs significantly from both Adelie and Chinstrap, while Adelie and Chinstrap do not differ significantly. Pairwise comparisons further showed that males have significantly higher body mass than females in all three species, with the largest difference observed in Gentoo.
+
+The analysis provides strong evidence of differences in body mass by species and sex. However, the ANOVA assumptions should be considered, particularly normality and homogeneity of variance. The data may also be unbalanced across groups, which can affect the analysis. Future analysis could use robust methods or transformations if assumption violations are substantial.
+
+Based on these results, species and sex should both be considered when analyzing or predicting penguin body mass. In particular, the significant interaction suggests that the effect of sex should not be interpreted independently of species. Further studies could collect more balanced samples across species and sexes to improve the reliability and generalizability of the findings.
