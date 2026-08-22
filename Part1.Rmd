@@ -277,9 +277,48 @@ kable(
 )
 
 n_duplicate_rows <- sum(duplicated(analysis_data))
+n_missing_total  <- sum(is.na(analysis_data))
+n_levels_freq    <- dplyr::n_distinct(data_raw$frequency)
+n_levels_chord   <- dplyr::n_distinct(data_raw$chord_length)
+n_levels_vel     <- dplyr::n_distinct(data_raw$free_stream_velocity)
+n_levels_angle   <- dplyr::n_distinct(data_raw$attack_angle)
+n_levels_thick   <- dplyr::n_distinct(data_raw$suction_side_displacement_thickness)
 
-n_duplicate_rows
+kable(
+  data.frame(
+    Check = c("Missing values (total cells)", "Fully duplicated rows"),
+    Count = c(n_missing_total, n_duplicate_rows)
+  ),
+  caption = "Missing-value and duplicate-row checks on the raw data."
+)
 ```
+
+The dataset contains `r nrow(data_raw)` observations of `r ncol(data_raw)` numeric
+variables: five predictors recorded during NACA 0012 airfoil wind-tunnel tests
+and the response `scaled_sound_pressure`, the scaled sound pressure level in
+decibels. No missing values or duplicated rows are present (table above), so no
+imputation or de-duplication is required before the split.
+
+The `Distinct` column in Table 1 shows that the five predictors are not equally
+"continuous" in practice. `frequency`, `chord_length`, and `free_stream_velocity`
+take only `r n_levels_freq`, `r n_levels_chord`, and `r n_levels_vel` distinct
+values respectively - these are the fixed 1/3-octave frequency bands, airfoil
+chord lengths, and wind-tunnel speeds used to design the experiment, so each
+behaves more like an ordinal experimental factor than a freely varying
+measurement. `attack_angle` (`r n_levels_angle` distinct values) and
+`suction_side_displacement_thickness` (`r n_levels_thick` distinct values) are
+closer to genuinely continuous quantities. This low cardinality on three of the
+five predictors is expected to show up later as visibly clustered histograms and
+boxplots (1C) rather than smooth continuous distributions, and is a property of
+the experimental design rather than a data-quality issue.
+
+`data/data_description.md` (the accompanying UCI variable sheet) lists
+`attack_angle` as "Binary", which does not match what is observed here - the
+variable takes `r n_levels_angle` distinct values between
+`r round(min(data_raw$attack_angle), 1)` and `r round(max(data_raw$attack_angle), 1)`
+degrees. This looks like a labelling error in the source sheet, and `attack_angle`
+is treated as continuous throughout, consistent with the assignment brief's own
+description of the dataset ("angle of attack" as a continuous input).
 
 
 
