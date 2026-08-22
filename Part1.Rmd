@@ -659,8 +659,20 @@ kable(
     Value = as.numeric(summary[,1])
   )
 )
+
+resp_skew <- skewness(y_train)
 ```
 
+The response ranges from `r round(min(y_train), 1)` to `r round(max(y_train), 1)`
+dB with a median of `r round(median(y_train), 1)` dB and mean
+`r round(mean(y_train), 1)` dB. The histogram and the small gap between mean and
+median show a mild left skew (skewness $\approx `r round(resp_skew, 2)`$): most
+measurements cluster in the `r round(quantile(y_train, 0.25), 0)`-
+`r round(quantile(y_train, 0.75), 0)` dB range, with a longer tail toward the
+quieter (lower-dB) end rather than the loud end. The skew is mild enough that no
+response transformation is applied - RMSE and MAE on the original dB scale
+remain directly interpretable as sound-pressure prediction errors, which matters
+for Problem 1's evaluation step.
 
 ### Predictor Histogram  & Boxplot
 
