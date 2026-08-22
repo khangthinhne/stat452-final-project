@@ -630,8 +630,23 @@ image(1, seq(0, 1, length.out = 100), legend_scale,
 axis(4, at = seq(0, 1, by = 0.1), las = 1, cex.axis = 0.8)
 ```
 
+```{r eda-cor-summary, echo=FALSE, warning=FALSE, message=FALSE}
+cor_off_diag <- cor_matrix
+diag(cor_off_diag) <- NA
+max_pair_idx <- which(abs(cor_off_diag) == max(abs(cor_off_diag), na.rm = TRUE), arr.ind = TRUE)[1, ]
+max_pair_vars <- rownames(cor_matrix)[max_pair_idx]
+max_pair_val  <- cor_matrix[max_pair_idx[1], max_pair_idx[2]]
+```
 
-### Response Distribution 
+Predictor-predictor correlations are weak across most pairs. The one exception
+is `r max_pair_vars[1]` and `r max_pair_vars[2]`, correlated at
+$r \approx `r round(max_pair_val, 2)`$ - a moderate relationship, plausible
+given both describe the airfoil's boundary-layer geometry at the trailing edge.
+No other pair exceeds $|r| \approx 0.5$. This single moderate correlation is
+revisited with the VIF check below and is the main multicollinearity signal
+this dataset offers ridge and lasso a reason to address in Problem 2.
+
+### Response Distribution
 
 ```{r eda-response-dist, echo=FALSE, warning=FALSE, message=FALSE}
 
