@@ -347,7 +347,7 @@ To ensure a fair comparison among OLS, ridge, lasso, and elastic net, all prepro
 
 ### Data split
 
-The observations were randomly partitioned into training and test sets using the custom `split_rows()` function with a training proportion of 80%. For Group 4, the split seed was **240204**, ensuring that the same partition can be reproduced in future analyses.
+The observations were randomly partitioned into training and test sets using the custom `split_rows()` function with a training proportion of 80%. For Group `r sprintf("%02d", group_number)`, the split seed was **`r seeds$split`**, ensuring that the same partition can be reproduced in future analyses.
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
 kable(
@@ -368,7 +368,7 @@ Using training-derived scaling parameters prevents information from the holdout 
 
 ### Five-fold cross-validation
 
-Model tuning was carried out using five-fold cross-validation on the training data only. Fold assignments were generated using the fixed cross-validation seed **240304** and were shared across all regularized models. Reusing identical folds ensures that differences in cross-validation performance are attributable to the models themselves rather than random variation in fold assignment.
+Model tuning was carried out using five-fold cross-validation on the training data only. Fold assignments were generated using the fixed cross-validation seed **`r seeds$cv`** and were shared across all regularized models. Reusing identical folds ensures that differences in cross-validation performance are attributable to the models themselves rather than random variation in fold assignment.
 
 ### Missing-value handling
 
