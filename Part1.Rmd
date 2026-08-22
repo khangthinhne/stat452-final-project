@@ -466,6 +466,86 @@ sample away from precisely the loud, high-frequency regime the model is meant to
 predict, so all `r nrow(train_df)` training rows are kept for model fitting in
 Problem 2.
 
+### Transformation check
+
+```{r transform-check, echo=FALSE, warning=FALSE, message=FALSE}
+skewness <- function(x) {
+  z <- x - mean(x)
+  mean(z^3) / (mean(z^2))^1.5
+}
+
+skew_raw <- vapply(train_df[, predictors], skewness, numeric(1))
+skew_log <- c(
+  frequency = skewness(log(train_df$frequency)),
+  suction_side_displacement_thickness =
+    skewness(log(train_df$suction_side_displacement_thickness))
+)
+
+skew_table <- data.frame(
+  Variable           = names(skew_raw),
+  Skewness           = unname(round(skew_raw, 3)),
+  Skewness_after_log = c(
+    round(skew_log[["frequency"]], 3), NA, NA,
+    round(skew_log[["suction_side_displacement_thickness"]], 3), NA
+  ),
+  row.names = NULL
+)
+
+kable(
+  skew_table,
+  caption = paste("Training-set skewness of each predictor, and after a log",
+                   "transform for the two most skewed variables.")
+)
+
+# Does log-transforming the two skewed predictors improve a plain linear fit?
+ols_raw_form <- reformulate(predictors, response = config$response)
+ols_raw_fit  <- lm(ols_raw_form, data = train_df)
+
+train_df_log <- train_df
+train_df_log$frequency <- log(train_df_log$frequency)
+train_df_log$suction_side_displacement_thickness <-
+  log(train_df_log$suction_side_displacement_thickness)
+ols_log_fit <- lm(ols_raw_form, data = train_df_log)
+
+r2_raw <- summary(ols_raw_fit)$r.squared
+r2_log <- summary(ols_log_fit)$r.squared
+
+# Is the frequency effect itself curved rather than log-shaped?
+r2_freq_linear <- summary(lm(train_df[[config$response]] ~ train_df$frequency))$r.squared
+r2_freq_quad   <- summary(lm(train_df[[config$response]] ~ train_df$frequency +
+                                I(train_df$frequency^2)))$r.squared
+```
+
+`frequency` and `suction_side_displacement_thickness` are the two right-skewed
+predictors identified above (skewness `r round(skew_raw[["frequency"]], 2)` and
+`r round(skew_raw[["suction_side_displacement_thickness"]], 2)`). A log
+transform brings both close to symmetric on the training set (skewness
+`r round(skew_log[["frequency"]], 2)` and
+`r round(skew_log[["suction_side_displacement_thickness"]], 2)`), which is the
+usual motivation for log-transforming a positive, right-skewed engineering
+measurement. `attack_angle` is also mildly right-skewed (skewness
+`r round(skew_raw[["attack_angle"]], 2)`, Table above) but far less than
+`suction_side_displacement_thickness`, so it is not treated as a transform
+candidate here.
+
+However, symmetrizing the marginal distribution is not the same as improving
+the fit, and it is checked rather than assumed. Refitting a plain linear model
+on the training data with these two predictors log-transformed gives
+$R^2 = `r round(r2_log, 4)`$, against $R^2 = `r round(r2_raw, 4)`$ for the
+untransformed predictors - the log transform does not improve, and mildly
+*hurts*, the linear fit. A separate check on `frequency` alone points to why: a
+quadratic term explains more of the response than a linear term
+($R^2 = `r round(r2_freq_quad, 4)`$ vs. $R^2 = `r round(r2_freq_linear, 4)`$),
+so the frequency-response relationship is curved in a way a log transform does
+not match - consistent with the assignment brief's own framing of this dataset
+as having "few features but nonlinear relationships."
+
+Given this evidence, no log transform is applied. All predictors are carried
+forward on their original scale into Problem 2, with only the training-derived
+standardization described above; the nonlinearity documented here is noted as a
+limitation of the linear and regularized-linear models used there, rather than
+something a simple transform resolves.
+
 ### Leakage control
 
 Several safeguards were implemented to prevent information leakage throughout the analysis:
