@@ -887,9 +887,10 @@ kable(
 ```
 
 All estimates sit on the standardized scale fixed in 1B, so their magnitudes are
-directly comparable across rows and the intercept is the training mean of `lpsa`.
-A slope whose sign contradicts the predictor's marginal correlation with `lpsa`
-is the first symptom of collinearity, examined below.
+directly comparable across rows and the intercept is the training mean of
+`scaled_sound_pressure`. A slope whose sign contradicts the predictor's marginal
+correlation with the response (1C) is the first symptom of collinearity,
+examined below.
 
 ```{r ols-metrics}
 # In-sample fit quality
@@ -941,8 +942,8 @@ kable(
 
 The table gathers the in-sample fit and the five-fold cross-validation error on
 the shared folds. The training rows are optimistic because the model was scored
-on the same patients it was fitted on, whereas the CV rows estimate error on
-unseen patients. The final row - the standard error of the CV-MSE across folds -
+on the same rows it was fitted on, whereas the CV rows estimate error on
+unseen rows. The final row - the standard error of the CV-MSE across folds -
 is the quantity `cv.glmnet` reports as `cvsd` for ridge and lasso, so 2D can
 compare all three methods with error bars rather than bare point estimates.
 
@@ -951,8 +952,9 @@ compare all three methods with error bars rather than bare point estimates.
 ols_beta <- function(term) ols_coefs$estimate[ols_coefs$term == term]
 ols_pval <- function(term) ols_coefs$p.value[ols_coefs$term == term]
 
-# Compute lcavol–lcp correlation on training data (used in narrative)
-cor_lcavol_lcp <- cor(x_train[, "lcavol"], x_train[, "lcp"])
+# Correlation between the one moderately related predictor pair flagged in 1C
+# (used in narrative below).
+cor_angle_thick <- cor(x_train[, "attack_angle"], x_train[, "suction_side_displacement_thickness"])
 
 # Quantify collinearity from this fit. VIF is scale-invariant, so standardizing
 # in 1B leaves it unchanged and these values match the VIF table reported in 1C.
@@ -960,18 +962,9 @@ ols_vif      <- car::vif(ols_fit)
 max_vif      <- max(ols_vif)
 max_vif_term <- names(which.max(ols_vif))
 
-# Identify non-significant predictors (p > 0.05, excluding intercept)
-nonsig_terms <- ols_coefs %>%
-  filter(term != "(Intercept)", p.value > 0.05) %>%
-  pull(term)
-nonsig_max_t <- ols_coefs %>%
-  filter(term %in% nonsig_terms) %>%
-  summarise(max_abs_t = max(abs(statistic))) %>%
-  pull(max_abs_t)
-nonsig_min_p <- ols_coefs %>%
-  filter(term %in% nonsig_terms) %>%
-  summarise(min_p = min(p.value)) %>%
-  pull(min_p)
+# Marginal (1C) vs partial (this fit) effect of suction_side_displacement_thickness,
+# used to illustrate how sharing variance with attack_angle changes its coefficient.
+thick_marginal_cor <- cor(x_train[, "suction_side_displacement_thickness"], y_train)
 ```
 
 **Model summary.** The OLS model is fitted on the `r nrow(x_train)` standardized
@@ -979,43 +972,46 @@ training observations using all `r ncol(x_train)` candidate predictors, with no
 penalty and no variable selection. It is therefore the unregularized baseline
 against which ridge and lasso are judged in 2B--2C.
 
-**Coefficient interpretation.** Two predictors dominate, and one is borderline.
+**Coefficient interpretation.** All five predictors are highly significant
+($p < 0.001$ for every one, table above), so the ranking below is by
+coefficient magnitude rather than by which predictors "matter".
 
-- `lcavol` carries the largest standardized coefficient
-  ($\hat{\beta} \approx `r round(ols_beta("lcavol"), 2)`$,
-  $p `r ifelse(ols_pval("lcavol") < 0.001, "< 0.001", sprintf("\\approx %.3f", ols_pval("lcavol")))`$),
-  confirming that log cancer volume is the single strongest linear predictor
-  of log PSA.
-- `svi` is the second-largest contributor
-  ($\hat{\beta} \approx `r round(ols_beta("svi"), 2)`$,
-  $p \approx `r round(ols_pval("svi"), 3)`$), indicating that seminal
-  vesicle invasion is associated with meaningfully higher PSA even after
-  adjusting for tumour volume.
-- `lweight` is marginally significant
-  ($p \approx `r round(ols_pval("lweight"), 3)`$); the remaining
-  `r length(nonsig_terms)` predictors
-  (`r paste0("\x60", nonsig_terms, "\x60", collapse = ", ")`) all have
-  $|t| < `r round(nonsig_max_t + 0.05, 1)`$ and
-  $p > `r round(nonsig_min_p - 0.01, 2)`$.
+- `frequency` carries the largest standardized coefficient
+  ($\hat{\beta} \approx `r round(ols_beta("frequency"), 2)`$), confirming it as
+  the strongest single linear driver of the response, consistent with it also
+  having the strongest marginal correlation in 1C.
+- `chord_length` ($\hat{\beta} \approx `r round(ols_beta("chord_length"), 2)`$)
+  and `attack_angle`
+  ($\hat{\beta} \approx `r round(ols_beta("attack_angle"), 2)`$) are the next
+  largest contributors, both negative like `frequency`.
+- `free_stream_velocity` ($\hat{\beta} \approx `r round(ols_beta("free_stream_velocity"), 2)`$)
+  is the only predictor with a **positive** coefficient: higher free-stream
+  velocity is associated with a higher (louder) scaled sound pressure once the
+  other four predictors are held fixed.
+- `suction_side_displacement_thickness`
+  ($\hat{\beta} \approx `r round(ols_beta("suction_side_displacement_thickness"), 2)`$)
+  has the smallest coefficient magnitude of the five, despite being the
+  second-strongest predictor on its own in 1C ($r \approx `r round(thick_marginal_cor, 2)`$)
+  - the gap between its marginal and partial effect is explained below.
 
-**Collinearity concern.** The near-zero and sign-reversed coefficient for `lcp`
-($\hat{\beta} \approx `r round(ols_beta("lcp"), 2)`$) deserves comment:
-biologically, greater capsular penetration should go with higher PSA, and its
-marginal correlation with `lpsa` is indeed positive. The collinearity behind the
-flip is *moderate rather than severe* - the largest variance inflation factor
-is `r round(max_vif, 2)` (`r max_vif_term`) and `lcp`'s own is
-`r round(ols_vif[["lcp"]], 2)`, both comfortably below the conventional threshold
-of 5, consistent with the VIF table reported in 1C. Moderate sharing is still
-enough to flip *this particular* sign, because `lcp` carries almost no
-independent signal of its own: it is correlated with `lcavol` at
-$r \approx `r round(cor_lcavol_lcp, 2)`$ on the training set, so once `lcavol`
-has absorbed the shared variance what remains for `lcp` is close to noise
-($p \approx `r round(ols_pval("lcp"), 2)`$) and its sign is essentially free to
-move. Following the brief, this evidence is reported rather than removed; ridge
-and lasso in 2B--2C are expected to stabilize exactly these shared-variance
-coefficients.
+**Multicollinearity check.** No coefficient here flips sign relative to its
+marginal correlation with the response, so there is no `lcp`-style anomaly to
+report. The largest variance inflation factor is `r round(max_vif, 2)`
+(`r max_vif_term`), comfortably below the conventional threshold of 5,
+consistent with the VIF table in 1C. The one predictor pair sharing meaningful
+variance is `attack_angle` and `suction_side_displacement_thickness`
+($r \approx `r round(cor_angle_thick, 2)`$, the strongest predictor-predictor
+correlation found in 1C), and this is visible in the coefficient ranking above:
+`suction_side_displacement_thickness` correlates with the response almost as
+strongly as `chord_length` does on its own (1C), yet ends up with the smallest
+partial coefficient of the five, consistent with part of its explanatory power
+being absorbed by the correlated `attack_angle` once both enter the model
+jointly. Unlike the `lcp`-style sign flip this moderate sharing produces no sign
+reversal or loss of significance here, but it is the same underlying mechanism,
+and 2B-2C test whether ridge and lasso redistribute this pair's coefficients
+further as the penalty increases.
 
-```{r ols-qq, fig.cap="Normal Q-Q plot of the OLS standardized residuals against the 45-degree reference line. Points lie on the line when the errors are normal; the three largest departures are labelled with their row number in the original prostate.csv.", fig.height=4, fig.pos="H", out.extra=""}
+```{r ols-qq, fig.cap="Normal Q-Q plot of the OLS standardized residuals against the 45-degree reference line. Points lie on the line when the errors are normal; the three largest departures are labelled with their row number in the original airfoil_self_noise data.", fig.height=4, fig.pos="H", out.extra=""}
 # Residual diagnostic: the t-tests behind the p-values above assume roughly
 # normal errors, so the assumption is checked rather than taken on trust.
 # rstandard() divides each residual by its own standard error, which removes the
@@ -1024,7 +1020,7 @@ ols_std_resid <- rstandard(ols_fit)
 
 qq <- qqnorm(ols_std_resid, plot.it = FALSE)
 plot(qq$x, qq$y, type = "n",
-     main = "Normal Q-Q — OLS standardized residuals",
+     main = "Normal Q-Q - OLS standardized residuals",
      xlab = "Theoretical quantiles", ylab = "Standardized residuals")
 grid(col = "grey88", lty = 1, lwd = 0.6)
 
@@ -1034,7 +1030,7 @@ grid(col = "grey88", lty = 1, lwd = 0.6)
 abline(0, 1, col = "firebrick", lwd = 1.5, lty = 2)
 points(qq$x, qq$y, pch = 19, col = "steelblue", cex = 0.8)
 
-# Label the three worst departures by their original prostate.csv row, flipping
+# Label the three worst departures by their original data-row number, flipping
 # the side so the text stays inside the panel at both ends.
 worst_resid <- order(abs(ols_std_resid), decreasing = TRUE)[1:3]
 text(qq$x[worst_resid], qq$y[worst_resid], labels = train_id[worst_resid],
@@ -1045,25 +1041,30 @@ big_resid_rows <- train_id[which(abs(ols_std_resid) > 2)]
 max_qq_gap     <- max(abs(qq$y - qq$x))
 ```
 
-**Residual normality.** The p-values quoted above are $t$-tests, and on only
-`r nrow(x_train)` training rows they lean on the errors being approximately
-normal, so the assumption is checked rather than taken on trust. Each point in
-the Q-Q plot is one patient: its standardized residual against the value a
-normal sample of this size would be expected to produce at that rank. The points
-sit on the 45-degree line almost throughout - no residual departs from it by
-more than `r round(max_qq_gap, 2)` standard deviations - and a Shapiro--Wilk
-test agrees ($W = `r round(shapiro_ols$statistic, 3)`$,
-$p = `r round(shapiro_ols$p.value, 2)`$), nowhere near evidence against
-normality. `r length(big_resid_rows)` residuals fall beyond two standard
-deviations (original rows `r paste(big_resid_rows, collapse = ", ")`) against
-roughly `r round(0.05 * nrow(x_train))` expected by chance in a sample this size:
-a mild excess, not a violation, and the mild wander visible in the tails is what
-`r nrow(x_train)` draws from a genuinely normal distribution routinely look like.
+**Residual normality.** The p-values quoted above are $t$-tests, and they lean
+on the errors being approximately normal, so the assumption is checked rather
+than taken on trust. Each point in the Q-Q plot is one wind-tunnel measurement:
+its standardized residual against the value a normal sample of this size would
+be expected to produce at that rank. Visually the points sit close to the
+45-degree line - no residual departs from it by more than
+`r round(max_qq_gap, 2)` standard deviations - but with
+`r nrow(x_train)` training rows a Shapiro-Wilk test has enough power to detect
+even small departures, and here it does
+($W = `r round(shapiro_ols$statistic, 3)`$,
+$p = `r round(shapiro_ols$p.value, 4)`$): formally, normality is rejected at the
+5% level. $W$ itself is close to 1, so the rejection reflects a large sample
+picking up a mild, not a severe, departure. `r length(big_resid_rows)`
+residuals fall beyond two standard deviations, against roughly
+`r round(0.05 * nrow(x_train))` expected by chance in a sample this size - a
+noticeable excess, consistent with slightly heavier tails than a normal
+distribution rather than a handful of extreme outliers.
 
-Two consequences follow. The coefficient p-values in the table above can be read
-at face value rather than treated as approximations, and because the residual
-spread is symmetric with no heavy tail, RMSE is a fair summary of the error
-rather than a number dragged around by a few extreme misses.
+Two consequences follow. The coefficient p-values in the table above should be
+read as approximately, rather than exactly, valid, and because the tails are a
+little heavier than normal, RMSE - which squares errors and so weights the
+worst misses more heavily - is a somewhat more outlier-sensitive summary of
+error here than it would be under strict normality; MAE in the same table is
+the more robust companion figure for that reason.
 
 **Cross-validation error.** The five-fold CV RMSE
 (`r round(ols_cv_rmse, 3)`) is computed using the same `foldid` assignment that
@@ -1071,7 +1072,7 @@ will be passed to `cv.glmnet` for ridge and lasso, ensuring a like-for-like
 comparison. Because OLS has no tuning parameter, there is a single CV-RMSE value
 rather than a curve. It exceeds the training RMSE
 (`r round(ols_train_metrics[["RMSE"]], 3)`) by only about
-`r round(ols_cv_rmse - ols_train_metrics[["RMSE"]], 3)` on the log-PSA scale.
+`r round(ols_cv_rmse - ols_train_metrics[["RMSE"]], 3)` on the scaled-sound-pressure (dB) scale.
 This modest optimism gap reflects mild in-sample overfitting: it is small enough
 to suggest the `r ncol(x_train)`-predictor model already generalizes reasonably
 well on the `r nrow(x_train)`-row training sample, and 2B--2C will test whether
@@ -1080,21 +1081,20 @@ shrinkage narrows the gap further.
 That single CV number is itself an average of `r K` noisy pieces. The per-fold
 MSE ranges from `r round(min(cv_mse_folds), 2)` to `r round(max(cv_mse_folds), 2)`
 around a mean of `r round(ols_cv_mse, 2)`, giving a standard error of
-`r round(ols_cv_se, 3)`. With only about `r round(nrow(x_train) / K)` patients in
-each held-out fold that spread is unsurprising, but it fixes the resolution of
-every comparison that follows: two methods whose CV-MSE differ by less than
-roughly one standard error are not distinguishable on this evidence, and 2D must
-weigh the ridge and lasso results against that yardstick rather than declare a
-winner on a bare point estimate.
+`r round(ols_cv_se, 3)`. With about `r round(nrow(x_train) / K)` observations in
+each held-out fold this fixes the resolution of every comparison that follows:
+two methods whose CV-MSE differ by less than roughly one standard error are not
+distinguishable on this evidence, and 2D must weigh the ridge and lasso results
+against that yardstick rather than declare a winner on a bare point estimate.
 
-```{r ols-diagnostic, fig.cap="Cook's distance for the OLS fit. Bars above the dashed 4/n threshold are flagged as influential; each flagged bar is labelled with its row number in the original prostate.csv, not its training position.", fig.height=4, fig.pos="H", out.extra=""}
+```{r ols-diagnostic, fig.cap="Cook's distance for the OLS fit. Bars above the dashed 4/n threshold are flagged as influential; each flagged bar is labelled with its row number in the original airfoil_self_noise data, not its training position.", fig.height=4, fig.pos="H", out.extra=""}
 # Residual / influence diagnostic: Cook's distance
 cooks_d   <- cooks.distance(ols_fit)
 n_train   <- nrow(train_data)
 threshold <- 4 / n_train
 
-# Flagged points are labelled by their ORIGINAL row in prostate.csv (via train_id)
-# so a flagged patient can be traced back to the raw data.
+# Flagged points are labelled by their ORIGINAL row (via train_id) so a flagged
+# observation can be traced back to the raw data.
 flagged_pos <- which(cooks_d > threshold)
 flagged_row <- train_id[flagged_pos]
 
@@ -1103,7 +1103,7 @@ plot(cooks_d,
      type = "h", lwd = 1.5, col = "steelblue",
      ylim = c(0, max(cooks_d) * 1.30),
      ylab = "Cook's distance", xlab = "Training observation index",
-     main = "Cook's Distance — OLS Baseline")
+     main = "Cook's Distance - OLS Baseline")
 abline(h = threshold, lty = 2, col = "firebrick", lwd = 1.5)
 if (length(flagged_pos)) {
   # Labels are rotated: adjacent flagged bars would otherwise overprint each other.
@@ -1112,56 +1112,66 @@ if (length(flagged_pos)) {
        cex = 0.45, col = "firebrick", xpd = TRUE)
 }
 
-# Locate the most influential patient, and the heavy-prostate anomaly 1C flagged,
-# both reported by their original prostate.csv row number.
+# Locate the most influential row, and two contrasting rows that separate
+# leverage from residual size, all reported by their original data-row number.
 n_flagged   <- length(flagged_pos)
 top_pos     <- flagged_pos[which.max(cooks_d[flagged_pos])]
 top_row     <- train_id[top_pos]
-lweight_pos <- which.max(train_df$lweight)   # the log-weight outlier seen in 1C
-lweight_row <- train_id[lweight_pos]
-lweight_g   <- exp(train_df$lweight[lweight_pos])
-lweight_is_flagged <- lweight_pos %in% flagged_pos
 
 # Leverage separates the two ingredients Cook's distance mixes together.
 ols_leverage <- hatvalues(ols_fit)
 avg_leverage <- length(coef(ols_fit)) / n_train
+
+# High-leverage / low-residual example: the training row with the largest
+# leverage, which turns out to sit at the maximum observed frequency (1A/1C).
+hilev_pos <- which.max(ols_leverage)
+hilev_row <- train_id[hilev_pos]
+hilev_is_flagged <- hilev_pos %in% flagged_pos
+
+# Low-leverage / high-residual example: the training row with the largest
+# standardized residual, an ordinary point in predictor space that the model
+# simply predicts badly.
+hires_pos <- which.max(abs(ols_std_resid))
+hires_row <- train_id[hires_pos]
 ```
 
 **Influence diagnostic.** Cook's distance asks how far the whole fitted
-coefficient vector would move if one patient were deleted, so it combines a large
-residual and high leverage into a single number. Against the conventional
-threshold $4/n \approx `r round(threshold, 3)`$, `r n_flagged` of the
-`r n_train` training patients are flagged, the most influential being original
-row `r top_row` (Cook's $D \approx `r round(max(cooks_d), 2)`$).
+coefficient vector would move if one observation were deleted, so it combines a
+large residual and high leverage into a single number. Against the conventional
+threshold $4/n \approx `r round(threshold, 4)`$, `r n_flagged` of the
+`r n_train` training rows are flagged - a large count relative to `r n_train`,
+which is typical of this threshold on a big sample rather than a sign of `r n_flagged`
+genuinely extreme rows. The single most influential row is `r top_row`
+(Cook's $D \approx `r round(max(cooks_d), 3)`$), which combines both
+ingredients at once: leverage `r round(ols_leverage[top_pos] / avg_leverage, 1)`
+times the training average and a standardized residual of
+`r round(ols_std_resid[top_pos], 2)`.
 
-This connects the exploratory work in 1C to the fit. The heavy-prostate anomaly
-singled out there - original row `r lweight_row`, whose prostate weight of
-`r round(lweight_g)` g (log `r round(train_df$lweight[lweight_pos], 2)`) is far
-above every other patient while its `lpsa` is only
-`r round(train_df$lpsa[lweight_pos], 2)` - is
-`r if (lweight_is_flagged) "indeed among the flagged points" else "not flagged"`,
-with Cook's $D \approx `r round(cooks_d[lweight_pos], 2)`$. The oddity spotted in
-the plots therefore measurably moves the unpenalized fit rather than being merely
-cosmetic.
+Two other flagged rows separate those ingredients cleanly and connect back to
+1A/1C. Row `r hilev_row` has the single largest leverage in the training set
+(`r round(ols_leverage[hilev_pos] / avg_leverage, 1)` times the average) because
+it sits at `frequency` = `r train_df$frequency[hilev_pos]` Hz, the maximum value
+in the dataset and the extreme right-hand tail flagged as a legitimate
+experimental condition rather than an error in 1A-1B. Despite that extreme
+position in predictor space, its standardized residual is only
+`r round(ols_std_resid[hilev_pos], 2)` - comfortably inside the normal range,
+so the model predicts it well. Row `r hires_row` is the mirror image: an
+unremarkable position in predictor space (leverage close to the training
+average) but the largest standardized residual of any training row
+(`r round(ols_std_resid[hires_pos], 2)`) - a case the linear fit simply misses,
+not one it is destabilized by.
 
-The Q-Q plot lets us say *why* it moves the fit, because Cook's distance mixes
-two ingredients that the residual check separates. This patient's standardized
-residual is only `r round(ols_std_resid[lweight_pos], 2)`, comfortably inside the
-normal range - the model predicts him well. What makes him influential is
-leverage of `r round(ols_leverage[lweight_pos], 2)`,
-`r round(ols_leverage[lweight_pos] / avg_leverage, 1)` times the average of
-`r round(avg_leverage, 2)` and the largest in the training set: he is extreme in
-predictor space, not badly predicted. Every other flagged row is the mirror image -
-an unremarkable position but a residual beyond two standard deviations. In a
-sample of only `r nrow(x_train)` rows, both kinds of point bend coefficients
-easily, especially for the collinear pair `lcavol`/`lcp` whose estimates are
-already fragile.
-
-All flagged observations are retained rather than removed: they are clinically
-valid patients, and the brief requires the evidence to be explained rather than
-deleted. Their leverage is instead absorbed by the shrinkage introduced in
-2B--2C, which is one of the concrete things the regularized fits are expected to
-improve.
+This confirms the two ingredients Cook's distance mixes are genuinely distinct
+here, and that no single kind of anomaly dominates: some rows are influential
+because they are extreme in predictor space, others because they are badly
+predicted, and the worst case (row `r top_row`) is a row where both happen at
+once. All flagged observations are retained rather than removed - they are
+valid wind-tunnel measurements, consistent with the outlier decisions already
+made in 1B - and their leverage is instead absorbed by the shrinkage introduced
+in 2B--2C, which is one of the concrete things the regularized fits are expected
+to improve, particularly for the correlated `attack_angle` /
+`suction_side_displacement_thickness` pair whose estimates are the most
+sensitive to exactly this kind of point.
 
 ## 2B. Ridge regression
 
