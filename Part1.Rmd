@@ -1485,14 +1485,14 @@ The $\lambda_{min}$ and $\lambda_{1se}$ selection rules address different modeli
 
 ## 2E. Perturbation or stability check
 
-### Prediction: 
-Based on the theoretical properties of ridge and lasso regression, we expected the two methods to respond differently. Ridge regression was expected to remain stable because the L2 penalty distributes the effect across correlated predictors by shrinking their coefficients toward each other. Consequently, only small changes in prediction error and coefficient estimates were anticipated. 
+### Prediction:
+Based on the theoretical properties of ridge and lasso regression, we expected the two methods to respond differently. Ridge regression was expected to remain stable because the L2 penalty distributes the effect across correlated predictors by shrinking their coefficients toward each other. Consequently, only small changes in prediction error and coefficient estimates were anticipated.
 In contrast, lasso regression was expected to maintain similar prediction accuracy but perform variable selection by retaining only one predictor from the highly correlated pair. Therefore, we expected lasso's predictive performance to remain stable, while its selected variables could become less stable.
 
 ```{r perturbation}
 x_train_new = data.frame(x_train)
-x_train_new$lcavol_new <- x_train_new$lcavol + rnorm(nrow(x_train), 0, 0.1)
-kable(cor(x=x_train_new$lcavol, y = x_train_new$lcavol_new))
+x_train_new$frequency_new <- x_train_new$frequency + rnorm(nrow(x_train), 0, 0.1)
+kable(cor(x=x_train_new$frequency, y = x_train_new$frequency_new))
 
 ridge_new <- analysis_model(as.matrix(x_train_new), y_train, foldid=foldid, alpha = 0)
 lasso_new <- analysis_model(as.matrix(x_train_new), y_train, foldid=foldid, alpha = 1)
@@ -1519,7 +1519,7 @@ knitr::kable(df)
 ```
 
 
-To investigate the stability of ridge and lasso regression, a perturbation experiment was conducted by adding a new predictor (lcavol_new) that is a noisy duplicate of lcavol. This creates a pair of highly correlated predictors while preserving nearly the same information.
+To investigate the stability of ridge and lasso regression, a perturbation experiment was conducted by adding a new predictor (`frequency_new`) that is a noisy duplicate of `frequency`, the strongest predictor identified in 2A ($r \approx `r round(cor(x_train_new$frequency, x_train_new$frequency_new), 3)`$ with the original). This creates a pair of highly correlated predictors while preserving nearly the same information, on top of the already-correlated `attack_angle`/`suction_side_displacement_thickness` pair from 1C.
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
 n <- max(nrow(ridge$coef_min), nrow(ridge_new$coef_min))
@@ -1535,7 +1535,7 @@ df2 <- data.frame(
 df2 <- df2[1:n, ,drop=FALSE]
 df <- cbind(df1, df2, row.names = rownames(ridge_new$coef_min))
 df <- round(df, 4)
-names(df) <- c("Old Ridge's coef $\\lambda = \\lambda_{min}$","New Ridge's coef $\\lambda = \\lambda_{1se}$", "Old Ridge's coef $\\lambda = \\lambda_{min}$", "New Ridge's coef $\\lambda = \\lambda_{1se}$")
+names(df) <- c("Old Ridge's coef $\\lambda = \\lambda_{min}$", "Old Ridge's coef $\\lambda = \\lambda_{1se}$", "New Ridge's coef $\\lambda = \\lambda_{min}$", "New Ridge's coef $\\lambda = \\lambda_{1se}$")
 
 knitr::kable(df)
 ```
@@ -1555,17 +1555,91 @@ df2 <- df2[1:n, ,drop=FALSE]
 
 df <- cbind(df1, df2, row.names = rownames(lasso_new$coef_min))
 df <- round(df, 4)
-names(df) <- c("Old Lasso's coef $\\lambda = \\lambda_{min}$", "New Lasso's coef $\\lambda = \\lambda_{1se}$", "Old Lasso's coef $\\lambda = \\lambda_{min}$", "New Lasso's coef $\\lambda = \\lambda_{1se}$")
+names(df) <- c("Old Lasso's coef $\\lambda = \\lambda_{min}$", "Old Lasso's coef $\\lambda = \\lambda_{1se}$", "New Lasso's coef $\\lambda = \\lambda_{min}$", "New Lasso's coef $\\lambda = \\lambda_{1se}$")
 knitr::kable(df)
 ```
-Comparing the coefficient estimates before and after introducing the duplicated predictor shows that the selected predictors remained almost identical. The original variable lcavol retained nearly the same coefficient, while the duplicated variable lcavol_new received a zero coefficient at $\lambda_{min}$ and only a negligible coefficient at $\lambda_{1se}$. Thus, contrary to the theoretical possibility that lasso may switch between highly correlated predictors, the variable selection remained stable in this experiment, although the resulting model remained sparse and achieved similar predictive performance.
 
-### Result. 
-Above table summarizes the results before and after introducing the duplicated predictor. For ridge regression, the optimal regularization parameter increased, the coefficient norms decreased, and the condition numbers remained relatively stable. The cross-validation errors changed only slightly, indicating that predictive performance was largely unaffected despite the additional multicollinearity. Ridge also retained all predictors, increasing the number of nonzero coefficients from eight to nine.
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+freqnew_ridge_min <- ridge_new$coef_min["frequency_new", ]
+freqnew_ridge_1se <- ridge_new$coef_1se["frequency_new", ]
+freqnew_lasso_min <- lasso_new$coef_min["frequency_new", ]
+freqnew_lasso_1se <- lasso_new$coef_1se["frequency_new", ]
+```
 
-For lasso regression, the cross-validation errors, tuning parameters, coefficient norms, and numbers of selected predictors changed only marginally. Prediction accuracy therefore remained stable after the perturbation. The condition number increased substantially because the duplicated predictor made the design matrix considerably more ill-conditioned. Nevertheless, lasso continued to produce a sparse model by selecting only a subset of predictors.
+Comparing the coefficient estimates before and after introducing the duplicated
+predictor shows two different responses at the two tuning rules. At
+$\lambda_{1se}$, lasso's original five coefficients are essentially unchanged
+(coefficient norm `r round(lasso_cv$coef_1se_norm, 3)` before vs.
+`r round(lasso_new$coef_1se_norm, 3)` after) and `frequency_new` receives an
+**exact zero** coefficient ($\hat\beta = `r round(freqnew_lasso_1se, 4)`$) -
+the textbook lasso behaviour of picking one predictor from a near-duplicate
+pair and dropping the other entirely. At $\lambda_{min}$, however, the picture
+is more nuanced: `frequency` keeps almost all of its original coefficient
+($`r round(lasso_cv$coef_min["frequency", ], 3)`$ before,
+$`r round(lasso_new$coef_min["frequency", ], 3)`$ after) but `frequency_new`
+is *not* zeroed out, receiving a small nonzero weight of
+$`r round(freqnew_lasso_min, 3)`$ - lasso's active-set count at $\lambda_{min}$
+rises from `r lasso_cv$nonzero_min` to `r lasso_new$nonzero_min`. So lasso's
+often-cited "picks one and zeros the rest" behaviour held here, but only at the
+more conservative $\lambda_{1se}$ penalty; at $\lambda_{min}$ the penalty is
+too weak to force the duplicate fully to zero.
 
-The experimental results are largely consistent with the theoretical expectations. Ridge successfully handled the additional multicollinearity through stronger coefficient shrinkage while maintaining stable predictive performance and retaining all predictors. Lasso also maintained similar predictive accuracy and a sparse model, supporting the prediction that its prediction performance is robust to highly correlated predictors. If the selected predictor changed from lcavol to lcavol_new, this would further demonstrate the expected instability of lasso's variable selection among highly correlated predictors. Overall, the experiment confirms that ridge is more stable in handling multicollinearity, whereas lasso achieves greater interpretability through sparse variable selection while potentially exhibiting instability in the choice of correlated predictors.
+Ridge's response is the mirror image at both tuning rules: rather than favouring
+one of the pair, it splits the original `frequency` coefficient roughly evenly
+between `frequency` ($`r round(ridge_new$coef_min["frequency", ], 3)`$) and
+`frequency_new` ($`r round(freqnew_ridge_min, 3)`$) at $\lambda_{min}$, and
+similarly at $\lambda_{1se}$
+(`r round(ridge_new$coef_1se["frequency", ], 3)` and
+`r round(freqnew_ridge_1se, 3)`), consistent with the $L_2$ penalty
+redistributing shared explanatory power rather than selecting a winner.
+
+### Result.
+The table above summarizes the results before and after introducing the
+duplicated predictor. For ridge regression, $\lambda_{min}$ itself is unchanged
+(`r round(ridge$lambda_min, 4)`) and the cross-validation MSE barely moves
+(`r round(ridge$mse_min, 2)` to `r round(ridge_new$mse_min, 2)`), but the
+condition number at $\lambda_{min}$ nearly doubles
+(`r round(ridge$cond_min, 2)` to `r round(ridge_new$cond_min, 2)`) - adding a
+highly correlated predictor measurably worsens conditioning even though ridge
+handles it without any loss of predictive accuracy. At $\lambda_{1se}$ the
+effect is much smaller (`r round(ridge$cond_1se, 2)` to
+`r round(ridge_new$cond_1se, 2)`), because the larger penalty already dominates
+the added collinearity. Ridge's coefficient norm decreases slightly at both
+tuning rules (`r round(ridge$coef_min_norm, 2)` to
+`r round(ridge_new$coef_min_norm, 2)` at $\lambda_{min}$) because splitting one
+large coefficient into two smaller, correlated ones reduces the sum of squares
+even though the combined effect on the fit is nearly the same. As expected for
+ridge, the number of nonzero coefficients simply tracks the number of
+predictors offered to it (`r ridge$nonzero_min` to `r ridge_new$nonzero_min`).
+
+For lasso, predictive performance is similarly unaffected
+(CV-MSE `r round(lasso_cv$mse_min, 2)` to `r round(lasso_new$mse_min, 2)` at
+$\lambda_{min}$; `r round(lasso_cv$mse_1se, 2)` to
+`r round(lasso_new$mse_1se, 2)` at $\lambda_{1se}$), but the condition number
+tells a sharper story than ridge's. At $\lambda_{min}$ the condition number
+jumps from `r round(lasso_cv$cond_min, 2)` to
+`r round(lasso_new$cond_min, 2)` - far more than ridge's - because
+$\lambda_{min}$ is small enough that the fit sits close to the ill-conditioned
+unpenalized regression on a near-collinear pair. At $\lambda_{1se}$ the
+increase is much smaller (`r round(lasso_cv$cond_1se, 2)` to
+`r round(lasso_new$cond_1se, 2)`), because the stronger penalty - and the exact
+zero it places on `frequency_new` - keeps the effective design well away from
+collinearity.
+
+The experimental results are largely consistent with theoretical expectations,
+with one refinement. Ridge handled the added multicollinearity through
+coefficient redistribution rather than selection, maintaining stable predictive
+performance throughout, exactly as expected. Lasso's variable-selection
+behaviour, however, turned out to depend on the tuning rule: it is stable and
+sparse - selecting `frequency` and exactly zeroing `frequency_new` - only at
+the more conservative $\lambda_{1se}$, while at $\lambda_{min}$ it keeps both
+predictors active with unequal weights, closer to ridge's redistribution
+behaviour than to a clean selection. This matters for 2D's earlier point: on
+this dataset lasso already retained every predictor before any perturbation
+(2C), and this experiment shows its selection mechanism is most reliable at the
+more regularized $\lambda_{1se}$ tuning, reinforcing $\lambda_{1se}$ - not
+$\lambda_{min}$ - as the more trustworthy choice whenever lasso's sparsity is
+being relied upon for interpretation.
 
 # Problem 3. Mathematical mechanisms
 Let
