@@ -640,11 +640,6 @@ This residuals are generally scattered around the horizontal zero line across th
 
 The spread of the residuals is somewhat different between the fitted-value groups, but there is no clear funnel-shaped pattern where the spread consistently increases or decreases as the fitted values increase. Therefore, there is no strong visual evidence of severe heteroscedasticity from this plot.
 
-```{r}
-plot(model, which = 2)
-```
-This Q–Q plot shows most of the points closely follow the diagonal reference line, particularly in the middle section of the plot, indicating that the residuals are approximately normally distributed. This suggests that the assumption of normality required for ANOVA is reasonably satisfied.
-
 # Posthoc analysis:
 
 ```{r}
