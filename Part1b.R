@@ -1,0 +1,384 @@
+#Read data
+data <- read.csv("data/airfoil_self_noise.csv")
+
+dim(data)
+str(data)
+summary(data)
+
+colSums(is.na(data))
+sum(duplicated(data))
+
+# 1 EDA
+
+## Histogram
+hist(data$frequency)
+hist(data$attack.angle)
+hist(data$chord.length)
+hist(data$free.stream.velocity)
+hist(data$suction.side.displacement.thickness)
+hist(data$scaled.sound.pressure)
+
+## Boxplot
+boxplot(data$frequency)
+boxplot(data$attack.angle)
+boxplot(data$chord.length)
+boxplot(data$free.stream.velocity)
+boxplot(data$suction.side.displacement.thickness)
+boxplot(data$scaled.sound.pressure)
+
+## corr matrix
+cor(data)
+
+
+
+## Chạy test thêm vài cái, ko cần ghi dô report
+boxplot(data,
+        main = "Boxplots of Airfoil Self-Noise Variables",
+        las = 2)
+
+
+plot(data$frequency, data$scaled.sound.pressure,
+     xlab = "Frequency",
+     ylab = "Scaled Sound Pressure",
+     main = "Frequency vs Sound Pressure")
+
+plot(data$attack.angle, data$scaled.sound.pressure,
+     xlab = "Attack Angle",
+     ylab = "Scaled Sound Pressure",
+     main = "Attack Angle vs Sound Pressure")
+
+plot(data$chord.length, data$scaled.sound.pressure,
+     xlab = "Chord Length",
+     ylab = "Scaled Sound Pressure",
+     main = "Chord Length vs Sound Pressure")
+
+plot(data$free.stream.velocity, data$scaled.sound.pressure,
+     xlab = "Free-stream Velocity",
+     ylab = "Scaled Sound Pressure",
+     main = "Velocity vs Sound Pressure")
+
+plot(data$suction.side.displacement.thickness,
+     data$scaled.sound.pressure,
+     xlab = "Displacement Thickness",
+     ylab = "Scaled Sound Pressure",
+     main = "Thickness vs Sound Pressure")
+
+
+install.packages("car")  
+library(car)
+
+model_vif <- lm(
+  scaled.sound.pressure ~ frequency +
+    attack.angle +
+    chord.length +
+    free.stream.velocity +
+    suction.side.displacement.thickness,
+  data = data
+)
+
+vif(model_vif)
+
+pairs(data,
+      main = "Pairwise Relationships in Airfoil Self-Noise Data")
+
+
+#2 Data Cleaning
+boxplot(data,
+        main = "Boxplots of Airfoil Self-Noise Variables",
+        las = 2)
+        
+        
+        
+
+outlier_count <- sapply(data, function(x) {
+  Q1 <- quantile(x, 0.25)
+  Q3 <- quantile(x, 0.75)
+  IQR_value <- Q3 - Q1
+  
+  sum(x < Q1 - 1.5 * IQR_value |
+      x > Q3 + 1.5 * IQR_value)
+})
+
+outlier_count
+
+
+##Chạy thêm
+par(mfrow = c(1, 2))
+
+plot(data$frequency,
+     data$scaled.sound.pressure,
+     xlab = "Frequency",
+     ylab = "Scaled Sound Pressure",
+     main = "Original Frequency")
+
+plot(log(data$frequency),
+     data$scaled.sound.pressure,
+     xlab = "Log(Frequency)",
+     ylab = "Scaled Sound Pressure",
+     main = "Log-transformed Frequency")
+
+par(mfrow = c(1, 1))
+
+cor(data$frequency, data$scaled.sound.pressure)
+cor(log(data$frequency), data$scaled.sound.pressure)
+
+
+#3
+## Bước 3.1 — Xác định dataset
+data_clean <- data
+
+dim(data_clean)
+names(data_clean)
+
+## Bước 3.2 — Chia Train/Test
+set.seed(240204)
+
+n <- nrow(data_clean)
+
+train_id <- sample(
+  1:n,
+  size = floor(0.8 * n)
+)
+
+train <- data_clean[train_id, ]
+test <- data_clean[-train_id, ]
+
+nrow(train)
+nrow(test)
+
+## Bước 3.3 — Tách predictors và response
+predictors <- c(
+  "frequency",
+  "attack.angle",
+  "chord.length",
+  "free.stream.velocity",
+  "suction.side.displacement.thickness"
+)
+
+X_train <- train[, predictors]
+y_train <- train$scaled.sound.pressure
+
+X_test <- test[, predictors]
+y_test <- test$scaled.sound.pressure
+
+head(X_train)
+head(y_train)
+
+## Bước 3.4 — Scale training predictors
+train_mean <- sapply(X_train, mean)
+train_sd <- sapply(X_train, sd)
+
+X_train_scaled <- scale(
+  X_train,
+  center = train_mean,
+  scale = train_sd
+)
+
+colMeans(X_train_scaled)
+apply(X_train_scaled, 2, sd)
+
+
+## Bước 3.5 — Scale test set
+X_test_scaled <- scale(
+  X_test,
+  center = train_mean,
+  scale = train_sd
+)
+
+
+## Bước 3.6 — Chạy Lasso
+library(glmnet)
+
+set.seed(240404)
+
+lasso_cv <- cv.glmnet(
+  X_train_scaled,
+  y_train,
+  alpha = 1,
+  standardize = FALSE,
+  intercept = TRUE,
+  type.measure = "mse",
+  nfolds = 5
+)
+
+
+
+## Bước 3.7 — Tìm lambda tốt nhất
+lasso_cv$lambda.min
+
+
+## Bước 3.8 — Xem coefficient
+coef(lasso_cv, s = "lambda.min")
+
+
+
+
+## Bước 3.9 — Vẽ kết quả Cross-Validation
+plot(lasso_cv)
+
+plot(
+  lasso_cv$glmnet.fit,
+  xvar = "lambda",
+  label = TRUE
+)
+
+
+
+#4: Modelling with regularization
+
+## Step 4.1 — Baseline model: Linear Regression
+baseline <- lm(
+  y_train ~ X_train_scaled
+)
+
+summary(baseline)
+
+
+baseline <- lm(
+  y_train ~ frequency +
+    attack.angle +
+    chord.length +
+    free.stream.velocity +
+    suction.side.displacement.thickness,
+  data = data.frame(
+    y_train = y_train,
+    X_train_scaled
+  )
+)
+
+coef(baseline)
+
+
+
+
+## Step 4.2 — Ridge Regression
+set.seed(240404)
+
+ridge_cv <- cv.glmnet(
+  X_train_scaled,
+  y_train,
+  alpha = 0,
+  standardize = FALSE,
+  intercept = TRUE,
+  type.measure = "mse",
+  nfolds = 5
+)
+
+ridge_cv$lambda.min
+
+coef(ridge_cv, s = "lambda.min")
+
+
+
+
+## Step 4.3 — Xem Ridge coefficients
+coef(ridge_cv, s = "lambda.min")
+
+## Step 4.4 — Lasso model
+lasso_cv
+
+lasso_coef <- coef(
+  lasso_cv,
+  s = "lambda.min"
+)
+
+lasso_coef
+
+lasso_cv$lambda.min
+
+## Step 4.5 — So sánh coefficients
+baseline_coef <- coef(baseline)
+
+ridge_coef <- as.vector(
+  coef(ridge_cv, s = "lambda.min")
+)
+
+lasso_coef <- as.vector(
+  coef(lasso_cv, s = "lambda.min")
+)
+
+
+### Bảng so sánh các hệ số
+coef_comparison <- data.frame(
+  Variable = names(baseline_coef),
+  Baseline = baseline_coef,
+  Ridge = ridge_coef,
+  Lasso = lasso_coef
+)
+
+coef_comparison
+
+
+## Step 4.6 — Vẽ coefficient comparison
+coef_comparison
+plot(ridge_cv$glmnet.fit, xvar = "lambda", label = TRUE)
+plot(lasso_cv$glmnet.fit, xvar = "lambda", label = TRUE)
+
+# Step 5: Evaluation
+
+# 1. Create test data frame for baseline
+test_scaled_df <- data.frame(
+  y_test = y_test,
+  X_test_scaled
+)
+
+# 2. Predictions
+pred_baseline <- predict(
+  baseline,
+  newdata = test_scaled_df
+)
+
+pred_ridge <- predict(
+  ridge_cv,
+  newx = X_test_scaled,
+  s = "lambda.min"
+)
+
+pred_lasso <- predict(
+  lasso_cv,
+  newx = X_test_scaled,
+  s = "lambda.min"
+)
+
+# 3. Metrics
+rmse <- function(actual, predicted) {
+  sqrt(mean((actual - predicted)^2))
+}
+
+mae <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+
+r2 <- function(actual, predicted) {
+  1 - sum((actual - predicted)^2) /
+      sum((actual - mean(actual))^2)
+}
+
+# 4. Evaluation results
+evaluation <- data.frame(
+  Model = c("Baseline OLS", "Ridge", "Lasso"),
+  RMSE = c(
+    rmse(y_test, pred_baseline),
+    rmse(y_test, pred_ridge),
+    rmse(y_test, pred_lasso)
+  ),
+  MAE = c(
+    mae(y_test, pred_baseline),
+    mae(y_test, pred_ridge),
+    mae(y_test, pred_lasso)
+  ),
+  R2 = c(
+    r2(y_test, pred_baseline),
+    r2(y_test, pred_ridge),
+    r2(y_test, pred_lasso)
+  )
+)
+
+evaluation
+
+
+
+
+
+
+
