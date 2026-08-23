@@ -1449,18 +1449,39 @@ lasso_summary <- data.frame(
   lambda = c(lasso_cv$lambda_min, lasso_cv$lambda_1se),
   cv_error = c(lasso_cv$mse_min, lasso_cv$mse_1se),
   cond = c(lasso_cv$cond_min, lasso_cv$cond_1se),
-  coefficient_norm = c(sqrt(sum(lasso_cv$coef_min)),sqrt(sum(lasso_cv$coef_1se))),
+  coefficient_norm = c(sqrt(sum(lasso_cv$coef_min[-1]^2)),sqrt(sum(lasso_cv$coef_1se[-1]^2))),
   num_non_zero = c(lasso_cv$nonzero_min, lasso_cv$nonzero_1se),
-  row.names = c("Lasso"," ")
+  row.names = c("Lasso", "  ")
 )
 
 knitr::kable(rbind(ols_summary,ridge_summary,lasso_summary))
 
 ```
 
-Based on the training comparison, lasso with $\lambda_{min}$ achieved the lowest cross-validation error (`r lasso_cv$mse_min`) while reducing the number of predictors from eight to five. Ridge with $\lambda_{min}$ improved numerical stability compared with OLS by reducing both the coefficient norm and the condition number, but it retained all predictors and produced a higher CV error than lasso. The $\lambda_{1se}$ models applied stronger regularization, resulting in smaller coefficient norms and simpler models; however, this came at the cost of increased cross-validation error. Therefore, before inspecting the holdout responses, lasso with $\lambda_{min}$ is nominated as the core candidate, as it provides the best balance between predictive performance and interpretability through variable selection. This recommendation is based solely on the training data and will later be evaluated on the locked holdout set.
+The training comparison tells a different story here than the classic
+"lasso selects, ridge stabilizes" narrative. All five candidates -
+OLS, ridge, and lasso at both tuning rules - retain all
+`r ncol(x_train)` predictors: on this dataset lasso performs no variable
+selection at either $\lambda_{min}$ or $\lambda_{1se}$ (2C), so it offers no
+interpretability advantage over ridge here. The five CV errors are also close
+together (`r round(min(rbind(ols_summary,ridge_summary,lasso_summary)$cv_error), 2)`
+to `r round(max(rbind(ols_summary,ridge_summary,lasso_summary)$cv_error), 2)`),
+well inside one cross-validation standard error of each other
+(`r round(ols_cv_se, 2)`, 2A) - none of the five is distinguishable from any
+other on predictive accuracy alone. What *does* separate them is conditioning:
+ridge at $\lambda_{min}$ nearly matches OLS's and lasso's CV error while roughly
+halving the condition number (`r round(ridge$cond_min, 2)` vs OLS's
+`r round(ols_cond, 2)`), and $\lambda_{1se}$ improves conditioning further for
+both ridge and lasso at a small additional cost in CV error. Because lasso does
+not sparsify this model, the usual accuracy-vs-interpretability trade-off does
+not apply; the trade-off that remains is prediction accuracy vs. numerical
+stability. On that basis, **ridge at $\lambda_{min}$** is nominated as the core
+candidate: it is statistically tied with OLS and lasso on training CV error
+while providing a meaningfully better-conditioned fit. This recommendation is
+based solely on the training data and will later be evaluated on the locked
+holdout set.
 
-The $\lambda_{min}$ and $\lambda_{1se}$ selection rules address different modeling objectives. The $\lambda_{min}$ rule selects the value of $\lambda$ that minimizes the cross-validation error and therefore prioritizes predictive accuracy. In contrast, the $\lambda_{1se}$ rule selects the largest $\lambda$ whose cross-validation error is within one standard error of the minimum, favouring a simpler and more stable model with stronger regularization. These rules therefore answer different decision questions: whether the primary objective is the best possible prediction or a more parsimonious model with comparable predictive performance. Predictive performance is assessed by the cross-validation error, whereas variable selection concerns which predictors remain in the model, and interpretability concerns how easily the resulting model can be understood. In our results, lasso with $\lambda_{min}$ achieved the lowest cross-validation error, while lasso with $\lambda_{1se}$ retained fewer predictors, illustrating the trade-off between prediction accuracy and model simplicity.
+The $\lambda_{min}$ and $\lambda_{1se}$ selection rules address different modeling objectives. The $\lambda_{min}$ rule selects the value of $\lambda$ that minimizes the cross-validation error and therefore prioritizes predictive accuracy. In contrast, the $\lambda_{1se}$ rule selects the largest $\lambda$ whose cross-validation error is within one standard error of the minimum, favouring a simpler and more stable model with stronger regularization. These rules therefore answer different decision questions: whether the primary objective is the best possible prediction or a simpler, more stable model with comparable predictive performance. Predictive performance is assessed by the cross-validation error, whereas variable selection concerns which predictors remain in the model, and interpretability concerns how easily the resulting model can be understood. In our results this trade-off shows up in *conditioning* rather than in *sparsity*: $\lambda_{1se}$ retains exactly as many predictors as $\lambda_{min}$ for both ridge and lasso (2B-2C), but trades a small increase in cross-validation error for a meaningfully better-conditioned fit, illustrating a stability-vs-accuracy trade-off rather than a complexity-vs-accuracy one.
 
 ## 2E. Perturbation or stability check
 
