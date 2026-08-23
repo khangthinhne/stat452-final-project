@@ -1179,6 +1179,7 @@ sensitive to exactly this kind of point.
 
 ```{r ridge}
 ridge <- analysis_model(x = x_train, y = y_train, alpha=0, foldid = foldid)
+ridge_cvsd_min <- ridge$model$cvsd[ridge$model$lambda == ridge$model$lambda.min]
 ```
 
 ```{r ridge-plot, echo=FALSE, warning=FALSE, message=FALSE}
@@ -1204,7 +1205,10 @@ kable(
 )
 
 ```
-With $\lambda_{min} = `r ridge$lambda_min`$, the 5-fold cross-validation MSE reaches its minimum value of $MSE_{min} = `r ridge$mse_min`$, indicating the best predictive performance among the candidate values of $\lambda$. However, the corresponding Ridge model still has a relatively large condition number, suggesting that the model remains sensitive to multicollinearity and may not be sufficiently stable.
+```{r echo=FALSE}
+ols_cond <- safe_condition_numbers(x_train, lambda = 0)[2]
+```
+With $\lambda_{min} = `r round(ridge$lambda_min, 4)`$, the 5-fold cross-validation MSE reaches its minimum value of $MSE_{min} = `r round(ridge$mse_min, 4)`$, indicating the best predictive performance among the candidate values of $\lambda$. The corresponding condition number, `r round(ridge$cond_min, 2)`, is already a substantial improvement over the unpenalized Gram matrix's `r round(ols_cond, 2)` (1C/3C) - even this mildly-collinear dataset (max VIF `r round(max_vif, 2)`, 2A) benefits measurably from even a small ridge penalty.
 
 ### Lambda 1se:
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
@@ -1225,7 +1229,17 @@ kable(
 )
 
 ```
-Although the one-standard-error rule selected a larger penalty $\lambda_{1se} = `r ridge$lambda_1se`$, the condition number decreased strongly from `r ridge$cond_min` to `r ridge$cond_1se`. In contrast, the cross-validation MSE increased from `r ridge$mse_min` to `r ridge$mse_1se`. 
+Although the one-standard-error rule selected a larger penalty
+$\lambda_{1se} = `r round(ridge$lambda_1se, 4)`$, the condition number decreased
+further from `r round(ridge$cond_min, 2)` to `r round(ridge$cond_1se, 2)`. In
+contrast, the cross-validation MSE increased from `r round(ridge$mse_min, 3)`
+to `r round(ridge$mse_1se, 3)`, a gap of
+`r round(ridge$mse_1se - ridge$mse_min, 3)` that is smaller than ridge's own
+cross-validation standard error at $\lambda_{min}$
+(`r round(ridge_cvsd_min, 3)`, the `cvsd` `cv.glmnet` reports, mirroring the
+per-fold SE computed for OLS in 2A) - the two penalties are not statistically
+distinguishable on this evidence, so the extra stability from $\lambda_{1se}$ is
+close to free in prediction-error terms.
 
 ### Coefficients:
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
@@ -1240,7 +1254,7 @@ knitr::kable(
 )
 ```
 
-Compared with the OLS model, Ridge regression shrinks most regression coefficients toward zero, reducing their magnitudes through the regularization penalty. This shrinkage helps alleviate the effects of multicollinearity while retaining all predictors in the model. Most coefficients exhibit the expected behavior by moving closer to zero as the regularization strength increases. However, two coefficients show notable exceptions. The coefficient of \textbf{lcp} changes from a small negative value in the OLS model to positive values under Ridge regression. In addition, the coefficient of \textbf{gleason} increases in magnitude, moving further away from zero rather than shrinking like the other coefficients. These changes suggest that the effects of \textbf{lcp} and \textbf{gleason} are influenced by multicollinearity with other predictors. As Ridge simultaneously estimates all coefficients under a penalty, it redistributes the effects among correlated variables, causing some coefficients to increase in magnitude or even change sign despite the overall shrinkage trend.
+Compared with the OLS model, Ridge regression shrinks most regression coefficients toward zero, reducing their magnitudes through the regularization penalty, while retaining all five predictors in the model. `frequency`, `attack_angle`, `chord_length`, and `free_stream_velocity` all shrink exactly as expected, moving closer to zero as the penalty strengthens. `suction_side_displacement_thickness` is the one exception: its magnitude at $\lambda_{min}$ (`r round(ridge$coef_min["suction_side_displacement_thickness", ], 3)`) is slightly *larger* than its OLS estimate (`r round(ols_beta("suction_side_displacement_thickness"), 3)`), moving further from zero rather than shrinking. This is the same mechanism flagged in 2A: `suction_side_displacement_thickness` shares variance with the correlated `attack_angle` ($r \approx `r round(cor_angle_thick, 2)`$), and as Ridge shrinks `attack_angle`'s coefficient it redistributes some of that shared explanatory power back onto `suction_side_displacement_thickness`. Unlike a severe collinearity case, no sign changes anywhere in the table - the exception is a small redistribution, not an instability.
 
 ```{R echo=FALSE, warning=FALSE, message=FALSE}
 n_vars <- nrow(ridge$model$glmnet.fit$beta)
@@ -1251,7 +1265,7 @@ legend("topleft",
        lty = 1, 
        cex = 0.6)
 ```
-As $\lambda$ increases, all regression coefficients are progressively shrunk toward zero, demonstrating the regularization effect of Ridge regression. Conversely, as $\lambda$ decreases, the coefficients gradually move away from zero toward their OLS estimates. The coefficient of \textbf{lcavol} remains the largest throughout the regularization path, indicating that it has the strongest association with the response variable. The coefficients of  \textbf{svi} and lweight also increase substantially as the regularization weakens, suggesting relatively strong effects on the response. In contrast, the coefficients of \textbf{gleason}, \textbf{lbph}, and \textbf{pgg45} remain relatively small across the entire path, indicating weaker contributions to the model. The coefficient of age remains negative throughout the regularization path, reflecting a consistent negative relationship with the response variable. Notably, the coefficient of  \textbf{lcp} exhibits non-monotonic behavior, first increasing and then decreasing as $\lambda$ changes, suggesting that its estimated effect is sensitive to multicollinearity with other predictors.
+As $\lambda$ increases, all five coefficients are progressively shrunk toward zero, demonstrating the regularization effect of Ridge regression; as $\lambda$ decreases, they move back toward their OLS estimates. `frequency` remains the largest-magnitude coefficient across the range spanned by $\lambda_{min}$ and $\lambda_{1se}$ (`r round(ridge$coef_min["frequency", ], 2)` to `r round(ridge$coef_1se["frequency", ], 2)`), consistent with it being the strongest predictor throughout 1C-2A. `free_stream_velocity` is the only coefficient that stays positive along the entire path, mirroring the sign pattern already seen in OLS. No coefficient crosses zero or reverses sign between $\lambda_{min}$ and $\lambda_{1se}$ - the ridge penalty here is redistributing magnitude among correlated predictors (as seen above for `suction_side_displacement_thickness`), not fighting an unstable or sign-flipping fit.
 
 To address multicollinearity, Ridge impose an $L_2$ penalty on the regression coefficients. Rather than assigning a large coefficient to one correlated predictor and a small coefficient to another, Ridge shrinks the coefficients simultaneously and redistributes their effects among the correlated variables. Consequently, the coefficient estimates become more stable and less sensitive to small changes in the data.
 
