@@ -17,10 +17,7 @@ output:
   html_document:
     toc: true
     toc_depth: 3
-bibliography: references.bib
 link-citations: true
-nocite: |
-  @loshchilov2019decoupledweightdecayregularization, @krogh1992simple
 params:
   group_number: 02
 fontsize: 11pt
@@ -1011,7 +1008,7 @@ reversal or loss of significance here, but it is the same underlying mechanism,
 and 2B-2C test whether ridge and lasso redistribute this pair's coefficients
 further as the penalty increases.
 
-```{r ols-qq, fig.cap="Normal Q-Q plot of the OLS standardized residuals against the 45-degree reference line. Points lie on the line when the errors are normal; the three largest departures are labelled with their row number in the original airfoil_self_noise data.", fig.height=4, fig.pos="H", out.extra=""}
+```{r ols-qq, fig.cap="Normal Q-Q plot of the OLS standardized residuals against the 45-degree reference line. Points lie on the line when the errors are normal; the three largest departures are labelled with their row number in the original airfoil\\_self\\_noise data.", fig.height=4, fig.pos="H", out.extra=""}
 # Residual diagnostic: the t-tests behind the p-values above assume roughly
 # normal errors, so the assumption is checked rather than taken on trust.
 # rstandard() divides each residual by its own standard error, which removes the
@@ -1024,9 +1021,7 @@ plot(qq$x, qq$y, type = "n",
      xlab = "Theoretical quantiles", ylab = "Standardized residuals")
 grid(col = "grey88", lty = 1, lwd = 0.6)
 
-# The residuals are already standardized to the N(0, 1) scale, so the honest
-# reference is the 45-degree line y = x. qqline() would instead fit a line
-# through the sample quartiles, and with n = 77 that fit is itself noisy.
+plot.new()
 abline(0, 1, col = "firebrick", lwd = 1.5, lty = 2)
 points(qq$x, qq$y, pch = 19, col = "steelblue", cex = 0.8)
 
@@ -1087,7 +1082,7 @@ two methods whose CV-MSE differ by less than roughly one standard error are not
 distinguishable on this evidence, and 2D must weigh the ridge and lasso results
 against that yardstick rather than declare a winner on a bare point estimate.
 
-```{r ols-diagnostic, fig.cap="Cook's distance for the OLS fit. Bars above the dashed 4/n threshold are flagged as influential; each flagged bar is labelled with its row number in the original airfoil_self_noise data, not its training position.", fig.height=4, fig.pos="H", out.extra=""}
+```{r ols-diagnostic, fig.cap="Cook's distance for the OLS fit. Bars above the dashed 4/n threshold are flagged as influential; each flagged bar is labelled with its row number in the original airfoil\\_self\\_noise data, not its training position.", fig.height=4, fig.pos="H", out.extra=""}
 # Residual / influence diagnostic: Cook's distance
 cooks_d   <- cooks.distance(ols_fit)
 n_train   <- nrow(train_data)
@@ -2621,7 +2616,7 @@ The model in Section 4C is effectively a neural network frozen halfway through: 
 
 3. Install the required packages if necessary:
 
-```{r warning=FALSE, message = FALSE}
+```{r eval=FALSE, warning=FALSE, message = FALSE}
    install.packages(c("tidyverse", "glmnet", "broom", "knitr", "car"))
 ```
 4. Render `Group04_ProjectQuiz1.Rmd`. Fixed random seeds (split: 240204, CV: 240304, features: 240404) guarantee reproducible train/test splits, cross-validation folds, and ReLU feature generation.
