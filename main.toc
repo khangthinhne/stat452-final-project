@@ -1,0 +1,47 @@
+\contentsline {section}{Authorship and contribution statement}{2}{section*.2}%
+\contentsline {section}{Abstract}{2}{section*.3}%
+\contentsline {section}{\numberline {1}Prediction design}{2}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Target and predictors}{2}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}Split and preprocessing plan}{3}{subsection.1.2}%
+\contentsline {subsubsection}{\numberline {1.2.1}Missing-value handling}{3}{subsubsection.1.2.1}%
+\contentsline {subsubsection}{\numberline {1.2.2}Outlier detection and handling}{4}{subsubsection.1.2.2}%
+\contentsline {subsubsection}{\numberline {1.2.3}Data cleaning summary}{5}{subsubsection.1.2.3}%
+\contentsline {subsection}{\numberline {1.3}Data exploration}{5}{subsection.1.3}%
+\contentsline {subsubsection}{\numberline {1.3.1}Pairwise correlation among predictors}{5}{subsubsection.1.3.1}%
+\contentsline {subsubsection}{\numberline {1.3.2}Response Distribution}{6}{subsubsection.1.3.2}%
+\contentsline {subsubsection}{\numberline {1.3.3}Predictor Histogram \& Boxplot}{6}{subsubsection.1.3.3}%
+\contentsline {subsubsection}{\numberline {1.3.4}Correlation between predictors and response}{7}{subsubsection.1.3.4}%
+\contentsline {section}{\numberline {2}OLS, Ridge, and Lasso}{8}{section.2}%
+\contentsline {subsection}{\numberline {2.1}OLS baseline}{8}{subsection.2.1}%
+\contentsline {subsubsection}{\numberline {2.1.1}Cross-validation curve:}{10}{subsubsection.2.1.1}%
+\contentsline {subsubsection}{\numberline {2.1.2}Lambda:}{10}{subsubsection.2.1.2}%
+\contentsline {subsubsection}{\numberline {2.1.3}Ridge penalty selection}{10}{subsubsection.2.1.3}%
+\contentsline {subsubsection}{\numberline {2.1.4}Coefficients:}{11}{subsubsection.2.1.4}%
+\contentsline {subsection}{\numberline {2.2}Lasso regression}{13}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.1}Model fitting and cross-validation}{13}{subsubsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.2}Analysis of \(\mitlambda _{\text {min}}\)}{13}{subsubsection.2.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.3}Analysis of \(\mitlambda _{\text {1se}}\)}{14}{subsubsection.2.2.3}%
+\contentsline {subsubsection}{\numberline {2.2.4}Coefficient Path}{15}{subsubsection.2.2.4}%
+\contentsline {subsection}{\numberline {2.3}Controlled comparison and locked core model}{15}{subsection.2.3}%
+\contentsline {section}{\numberline {3}Experimental Design}{16}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Dataset selection}{16}{subsection.3.1}%
+\contentsline {subsubsection}{\numberline {3.1.1}Data Overview}{16}{subsubsection.3.1.1}%
+\contentsline {subsubsection}{\numberline {3.1.2}Research Questions \& Hypotheses}{17}{subsubsection.3.1.2}%
+\contentsline {paragraph}{\numberline {3.1.2.1}Factor A: Penguin Species}{17}{paragraph.3.1.2.1}%
+\contentsline {paragraph}{\numberline {3.1.2.2}Factor B: Penguin Sex}{18}{paragraph.3.1.2.2}%
+\contentsline {paragraph}{\numberline {3.1.2.3}Interaction Effect}{18}{paragraph.3.1.2.3}%
+\contentsline {subsubsection}{\numberline {3.1.3}Descriptive Statistics}{18}{subsubsection.3.1.3}%
+\contentsline {paragraph}{\numberline {3.1.3.1}Data Summary Statistics}{18}{table.10}%
+\contentsline {paragraph}{\numberline {3.1.3.2}Visualization}{19}{paragraph.3.1.3.2}%
+\contentsline {subparagraph}{\numberline {3.1.3.2.1}Histogram of Penguin Body Mass}{19}{subparagraph.3.1.3.2.1}%
+\contentsline {subparagraph}{\numberline {3.1.3.2.2}Box Plot}{19}{subparagraph.3.1.3.2.2}%
+\contentsline {subparagraph}{\numberline {3.1.3.2.3}Interaction Plot}{20}{subparagraph.3.1.3.2.3}%
+\contentsline {paragraph}{\numberline {3.1.3.3}Assumptions Check}{20}{paragraph.3.1.3.3}%
+\contentsline {subparagraph}{\numberline {3.1.3.3.1}Normality of Residuals}{20}{subparagraph.3.1.3.3.1}%
+\contentsline {subparagraph}{\numberline {3.1.3.3.2}Homogeneity of Variances}{21}{subparagraph.3.1.3.3.2}%
+\contentsline {subparagraph}{\numberline {3.1.3.3.3}Independence of Errors}{22}{subparagraph.3.1.3.3.3}%
+\contentsline {paragraph}{\numberline {3.1.3.4}Overall Assessment}{22}{paragraph.3.1.3.4}%
+\contentsline {subsection}{\numberline {3.2}ANOVA / Factorial design analysis}{22}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Posthoc analysis}{24}{subsection.3.3}%
+\contentsline {subsubsection}{\numberline {3.3.1}Practical significance}{26}{subsubsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.4}Conclusion and evaluation}{26}{subsection.3.4}%
