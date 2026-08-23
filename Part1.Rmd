@@ -1293,9 +1293,19 @@ Based on the 5-fold cross-validation curve generated for the Lasso regression mo
 
 * The Cross-Validation Curve: The red dots represent the average CV-MSE across the 5 folds for each $\lambda$ value, with the gray error bars denoting one standard error above and below the mean. As $-\log(\lambda)$ increases (moving from left to right, meaning the penalty weakens), the MSE initially drops, reaches a minimum, and then slightly stabilizes as the model approaches the unpenalized OLS limit.
 
-* Optimal $\lambda$ ($\lambda_{\text{min}}$): The right vertical dashed line marks `lambda.min`, the value that strictly minimizes the cross-validation MSE. At this optimal point for prediction accuracy ($-\log(\lambda) \approx 2.4$), the Lasso penalty retains 5 non-zero predictors*.
+* Optimal $\lambda$ ($\lambda_{\text{min}}$): The right vertical dashed line marks `lambda.min`
+($-\log(\lambda) \approx `r round(-log(lasso_cv$lambda_min), 2)`$), the value that
+strictly minimizes the cross-validation MSE. At this optimal point for
+prediction accuracy the Lasso penalty retains all
+`r lasso_cv$nonzero_min` predictors.
 
-* Parsimonious $\lambda$ ($\lambda_{\text{1se}}$): The left vertical dashed line marks `lambda.1se`, selected by the one-standard-error rule. This value applies a stronger penalty ($-\log(\lambda) \approx 1.67$) to produce a sparser model. It retains only 3 non-zero predictors while keeping the error within one standard deviation of the absolute minimum MSE, offering a robust trade-off between predictive power and model simplicity.
+* Parsimonious $\lambda$ ($\lambda_{\text{1se}}$): The left vertical dashed line
+marks `lambda.1se`
+($-\log(\lambda) \approx `r round(-log(lasso_cv$lambda_1se), 2)`$), selected by
+the one-standard-error rule. This value applies a stronger penalty to produce a
+more conservative model while keeping the error within one standard deviation
+of the absolute minimum MSE; whether it also produces a *sparser* model, in the
+sense of dropping predictors, is checked directly below rather than assumed.
 
 ### Analysis of $\lambda_{\text{min}}$
 
@@ -1315,13 +1325,38 @@ kable(
   digits = 4
 )
 ```
-The optimal tuning parameter selected by five-fold cross-validation is $\lambda_{\text{min}} \approx 0.0891$. This value strictly minimizes the cross-validation Mean Squared Error (CV-MSE) to 0.5790, providing the best predictive performance among all candidate penalty values. Furthermore, the condition number at this optimal threshold evaluates to 13.5119, indicating improved numerical stability compared to the unpenalized baseline.
+The optimal tuning parameter selected by five-fold cross-validation is
+$\lambda_{\text{min}} \approx `r round(lasso_cv$lambda_min, 4)`$. This value
+strictly minimizes the cross-validation Mean Squared Error to
+$`r round(lasso_cv$mse_min, 3)`$, essentially matching OLS's own CV-MSE
+(`r round(ols_cv_mse, 3)`, 2A) - unsurprising given how small $\lambda_{min}$
+is. The condition number at this threshold, `r round(lasso_cv$cond_min, 2)`,
+is a modest improvement over the unpenalized Gram matrix
+(`r round(ols_cond, 2)`, 1C/3C).
 
-At this level of regularization, the Lasso model retains five non-zero predictors: `lcavol`, `lweight`, `lbph`, `svi`, and `pgg45`. The remaining predictors (`age`, `lcp`, and `gleason`) are shrunk exactly to zero, demonstrating Lasso's ability to perform automatic variable selection while maintaining predictive accuracy.
+At this level of regularization, the Lasso model retains all
+`r lasso_cv$nonzero_min` predictors - `frequency`, `attack_angle`,
+`chord_length`, `free_stream_velocity`, and
+`suction_side_displacement_thickness` - none is shrunk exactly to zero. This is
+consistent with the OLS and VIF results in 2A: every predictor was already
+highly significant with only mild shared variance, so there is no clearly
+redundant predictor for Lasso's $L_1$ penalty to remove at this tuning value.
 
-The retained predictors suggest that tumor volume (`lcavol`) is the most influential variable, having the largest estimated coefficient (0.6761). Variables related to body weight (`lweight`), benign prostatic hyperplasia (`lbph`), seminal vesicle invasion (`svi`), and the percentage of Gleason grades 4 or 5 (`pgg45`) also contribute to predicting PSA levels, although with relatively smaller effects.
+The retained coefficients preserve the same ranking seen in OLS and ridge:
+`frequency` has the largest magnitude
+(`r round(lasso_cv$coef_min["frequency", ], 3)`), followed by `chord_length`
+(`r round(lasso_cv$coef_min["chord_length", ], 3)`) and `attack_angle`
+(`r round(lasso_cv$coef_min["attack_angle", ], 3)`), with
+`free_stream_velocity` (`r round(lasso_cv$coef_min["free_stream_velocity", ], 3)`)
+the only positive coefficient and
+`suction_side_displacement_thickness`
+(`r round(lasso_cv$coef_min["suction_side_displacement_thickness", ], 3)`)
+the smallest in magnitude.
 
-Overall, $\lambda_{\text{min}}$ produces the model with the lowest cross-validation error while preserving a moderate number of predictors. By balancing a low CV-MSE of 0.5790 with reasonable numerical stability (condition number $\approx 13.51$), this configuration offers an excellent trade-off between prediction accuracy and model complexity.
+Overall, $\lambda_{\text{min}}$ produces a model whose cross-validation error is
+essentially indistinguishable from OLS's while retaining every predictor: on
+this dataset, Lasso's contribution at $\lambda_{min}$ is confirming that all
+five predictors carry real signal, rather than selecting a subset of them.
 
 
 ### Analysis of $\lambda_{\text{1se}}$
@@ -1342,9 +1377,27 @@ kable(
   digits = 4
 )
 ```
-The one-standard-error rule selects $\lambda_{\text{1se}} \approx 0.1875$, which applies a stronger regularization penalty than $\lambda_{\text{min}}$. The corresponding five-fold cross-validation Mean Squared Error (CV-MSE) is 0.6218. Although this error is slightly higher than the minimum achieved by $\lambda_{\text{min}}$, it remains within one standard error of that minimum. Furthermore, the stronger penalty reduces the condition number to 9.9406, indicating greater numerical stability.
+The one-standard-error rule selects
+$\lambda_{\text{1se}} \approx `r round(lasso_cv$lambda_1se, 4)`$, which applies
+a stronger regularization penalty than $\lambda_{\text{min}}$. The
+corresponding five-fold cross-validation MSE is
+$`r round(lasso_cv$mse_1se, 3)`$. Although this is higher than the minimum
+achieved by $\lambda_{\text{min}}$, it remains within one standard error of
+that minimum by construction. The stronger penalty reduces the condition number
+to `r round(lasso_cv$cond_1se, 2)`, a substantial further improvement in
+conditioning.
 
-Under $\lambda_{\text{1se}}$, the Lasso model retains only three non-zero predictors: `lcavol`, `lweight`, and `svi`. Compared with the $\lambda_{\text{min}}$ configuration, the predictors `lbph` and `pgg45` are completely removed. This results in a more parsimonious and conservative model, successfully isolating the most critical clinical drivers of PSA levels with only a modest reduction in predictive performance.
+Under $\lambda_{\text{1se}}$, the Lasso model still retains all
+`r lasso_cv$nonzero_1se` predictors - unlike the sparser model this rule often
+produces, no predictor is driven to zero even under this stronger penalty.
+Coefficient magnitudes shrink further relative to $\lambda_{min}$ (for example
+`frequency` falls from `r round(lasso_cv$coef_min["frequency", ], 3)` to
+`r round(lasso_cv$coef_1se["frequency", ], 3)`), but the set of active
+predictors is unchanged. Combined with the $\lambda_{min}$ result above, this
+indicates that on this dataset Lasso's embedded feature-selection mechanism
+finds nothing to prune: every predictor's contribution is large enough,
+relative to the cross-validated penalty, to survive even the more conservative
+tuning rule.
 
 
 ### Coefficient Path
@@ -1364,9 +1417,9 @@ legend("topleft",
 ```
 
 
-Overall, the coefficient path shows that as $-\log(\lambda)$ increases (equivalently, as $\lambda$ decreases), the regularization penalty becomes weaker, allowing more predictors to enter the model and their coefficients to increase in magnitude. Under strong regularization, many coefficients are shrunk exactly to zero, while weaker regularization gradually recovers the full model.
+Overall, the coefficient path shows that as $-\log(\lambda)$ increases (equivalently, as $\lambda$ decreases), the regularization penalty becomes weaker and coefficients grow in magnitude toward their OLS values. Under strong enough regularization all five paths do eventually collapse to zero at the far left of the plot, but by the range spanned by $\lambda_{min}$ and $\lambda_{1se}$ - the only penalty strengths this analysis tunes to - every predictor is already active, matching the retained-predictor counts reported above.
 
-Among the predictors, **lcavol** enters the model first and consistently has the largest coefficient, indicating that it is the most influential predictor of **lpsa**. **svi** and **lweight** also become active relatively early and maintain positive coefficients throughout the path. In contrast, **age, lbph, lcp, gleason,** and **pgg45** enter only when the penalty becomes sufficiently small, suggesting that their contributions are comparatively weaker and less stable.
+`frequency` enters first (i.e. survives down to the smallest $\lambda$) and consistently has the largest-magnitude coefficient along the path, confirming it as the most influential predictor. `chord_length` and `attack_angle` follow a similar trajectory at smaller magnitudes, and `free_stream_velocity` is the only path that stays on the positive side of zero throughout. `suction_side_displacement_thickness` tracks a comparatively flat, small-magnitude path across the region shown - the same predictor whose coefficient 2B found to move *against* the general shrinkage trend under ridge.
 
 ## 2D Controlled comparison and locked core model
 
